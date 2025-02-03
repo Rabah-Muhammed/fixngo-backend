@@ -4,12 +4,15 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from django.contrib.auth import authenticate
-from api.models import User
 from .tokens import CustomRefreshToken
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from api.models import User, Worker
+from api.models import Booking, User, Worker
+from .serializers import BookingSerializer, ServiceSerializer
+from .models import Service
 from django.core.paginator import Paginator
+from rest_framework.parsers import MultiPartParser, FormParser
+
 
 class AdminLoginView(APIView):
     permission_classes = [AllowAny]
@@ -189,3 +192,69 @@ class DeleteWorkerView(APIView):
             return Response({"message": f"Worker {worker.username} has been deleted."}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({"error": "Worker not found or invalid role."}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ServiceListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get(self, request):
+        services = Service.objects.all().order_by('-created_at')
+        serializer = ServiceSerializer(services, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = ServiceSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+class ServiceDeleteView(APIView):
+    def delete(self, request, pk):
+        try:
+            service = Service.objects.get(pk=pk)
+            service.delete()
+            return Response({"message": "Service deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+        except Service.DoesNotExist:
+            return Response({"error": "Service not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+
+class ServiceUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, pk):
+        try:
+            service = Service.objects.get(pk=pk)
+            serializer = ServiceSerializer(service, data=request.data, partial=True)  # Use partial update for PUT
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Service.DoesNotExist:
+            return Response({"error": "Service not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        
+class BookingListView(APIView):
+    def get(self, request):
+        bookings = Booking.objects.all()
+        serializer = BookingSerializer(bookings, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    
+class CancelBookingView(APIView):
+
+    def post(self, request, booking_id):
+        try:
+            booking = Booking.objects.get(id=booking_id)
+            if booking.status == 'cancelled':
+                return Response({'detail': 'This booking has already been cancelled.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            booking.status = 'cancelled'  # Directly set to 'cancelled'
+            booking.save()
+
+            return Response({'detail': 'Booking cancelled successfully.'}, status=status.HTTP_200_OK)
+
+        except Booking.DoesNotExist:
+            return Response({'detail': 'Booking not found.'}, status=status.HTTP_404_NOT_FOUND)

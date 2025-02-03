@@ -1,36 +1,39 @@
-# Byte-compiled files
+# Python
 *.pyc
 *.pyo
-__pycache__/
+*.pyd
+_pycache_/
+*.so
 
-# Django migrations
+# Django
 *.log
-db.sqlite3
 *.pot
+*.py[cod]
+db.sqlite3
+*.sqlite3
+*.bak
+*.swp
+*.swo
+*.swn
+media/
+static/
 
-# Local environment settings
-.env
-
-# Media and static files
-/media
-/staticfiles
-/static
-
-# Virtual environments
+# Environments
+*.env
 venv/
-env/
-*.egg-info/
-.eggs/
+.env/
 
-# VSCode settings
+# IDEs and Editors
+.idea/
 .vscode/
 
-# PyCharm settings
-.idea/
+# MySQL/MariaDB
+*.pid
 
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints/
+# Jupyter Notebooks
+.ipynb_checkpoints
 
-# System files
-.DS_Store
-Thumbs.db
+# Virtualenv
+venv/
+
+client_secret.json

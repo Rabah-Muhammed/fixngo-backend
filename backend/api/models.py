@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from admin_app.models import Service
 
 class User(AbstractUser):
     USER_ROLES = (
@@ -29,6 +30,7 @@ class User(AbstractUser):
 
 class Worker(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="worker_profile")
+    services = models.ManyToManyField(Service, related_name="workers", blank=True)
     skills = models.TextField(blank=True, null=True)  # Can also use a ManyToManyField for predefined skills
     service_area = models.CharField(max_length=255, blank=True, null=True)
     availability_status = models.BooleanField(default=True)
@@ -37,3 +39,42 @@ class Worker(models.Model):
 
     def __str__(self):
         return f"Worker: {self.user.email}"
+
+
+
+class Slot(models.Model):
+    worker = models.ForeignKey(Worker, on_delete=models.CASCADE, related_name='slots')
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    is_available = models.BooleanField(default=True)  # If the worker is available during this slot
+    is_booked = models.BooleanField(default=False) 
+
+    class Meta:
+        ordering = ['start_time']
+        unique_together = ('worker', 'start_time', 'end_time')
+        indexes = [
+            models.Index(fields=['worker', 'start_time', 'end_time']),
+        ]
+
+    def __str__(self):
+        return f"{self.worker.user.username} - {self.start_time} to {self.end_time}"
+
+    
+    
+    
+class Booking(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('cancelled', 'Cancelled'),
+    )
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    worker = models.ForeignKey(Worker, on_delete=models.CASCADE)
+    service = models.ForeignKey(Service, on_delete=models.CASCADE)
+    slot = models.ForeignKey(Slot, on_delete=models.CASCADE)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Booking by {self.user.username} with {self.worker.user.username} for {self.service.name}"
