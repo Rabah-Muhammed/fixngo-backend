@@ -65,16 +65,22 @@ class WorkerSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source="user.email", read_only=True)
     phone_number = serializers.CharField(source="user.phone_number", read_only=True)
     profile_picture = serializers.ImageField(source="user.profile_picture", read_only=True)
+    services = ServiceSerializer(many=True, read_only=True)  # Include related services
 
     class Meta:
         model = Worker
-        fields = ["id", "username", "email", "phone_number", "profile_picture", "service_area", "availability_status", "rating", "completed_jobs"]
-        
-        
+        fields = [
+            "id", "username", "email", "phone_number", "profile_picture",
+            "service_area", "availability_status", "rating", "completed_jobs",
+            "services"
+        ]
+
 class WorkerSlotSerializer(serializers.ModelSerializer):
+    worker = WorkerSerializer(read_only=True)  # Embed worker details
+
     class Meta:
         model = Slot
-        fields = ['id', 'start_time', 'end_time', 'is_available']
+        fields = ['id', 'worker', 'start_time', 'end_time', 'is_available']
         
         
 class BookingSerializer(serializers.ModelSerializer):

@@ -1,3 +1,4 @@
+from django.http import JsonResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status,views
@@ -21,6 +22,8 @@ from admin_app.models import Service
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 import random
+import paypalrestsdk
+from django.conf import settings
 
 User = get_user_model()
 
@@ -303,6 +306,94 @@ class WorkerSlotPageView(APIView):
         serializer = WorkerSlotSerializer(available_slots, many=True)
         return Response({"slots": serializer.data}, status=status.HTTP_200_OK)
 
+
+
+class WorkerDetailView(APIView):
+    def get(self, request, worker_id):
+        try:
+            worker = Worker.objects.get(id=worker_id)
+            serializer = WorkerSerializer(worker)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Worker.DoesNotExist:
+            return Response({"error": "Worker not found"}, status=status.HTTP_404_NOT_FOUND)
+
+class ServiceDetailView(APIView):
+    def get(self, request, service_id):
+        try:
+            service = Service.objects.get(id=service_id)
+            serializer = ServiceSerializer(service)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Service.DoesNotExist:
+            return Response({"error": "Service not found"}, status=status.HTTP_404_NOT_FOUND)
+
+class SlotDetailView(APIView):
+    def get(self, request, slot_id):
+        try:
+            slot = Slot.objects.get(id=slot_id)
+            serializer = SlotSerializer(slot)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Slot.DoesNotExist:
+            return Response({"error": "Slot not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        
+        
+paypalrestsdk.configure({
+    'mode': 'sandbox',  # Change to 'live' for production
+    'client_id': settings.PAYPAL_CLIENT_ID,
+    'client_secret': settings.PAYPAL_CLIENT_SECRET,
+})
+
+class CreatePayPalOrder(APIView):
+    def post(self, request):
+        total_amount = request.data.get("totalAmount")
+        
+        payment = paypalrestsdk.Payment({
+            "intent": "sale",
+            "payer": {
+                "payment_method": "paypal"
+            },
+            "transactions": [{
+                "amount": {
+                    "total": str(total_amount),
+                    "currency": "USD"
+                },
+                "description": "Booking Payment"
+            }],
+            "redirect_urls": {
+                "return_url": "http://localhost:8000/payment/execute/",
+                "cancel_url": "http://localhost:8000/payment/cancel/"
+            }
+        })
+
+        if payment.create():
+            approval_url = next(link.href for link in payment.links if link.rel == "approval_url")
+            return JsonResponse({"approval_url": approval_url}, status=status.HTTP_200_OK)
+        else:
+            return JsonResponse({"error": "Payment creation failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class ExecutePayPalPayment(APIView):
+    def post(self, request):
+        payment_id = request.data.get("paymentId")
+        payer_id = request.data.get("payerId")
+
+        payment = paypalrestsdk.Payment.find(payment_id)
+
+        if payment.execute({"payer_id": payer_id}):
+            # Successful payment, create booking in your DB
+            booking_data = {
+                "worker": request.data.get("worker"),
+                "slot": request.data.get("slot"),
+                "service": request.data.get("service"),
+                "payment_id": payment.id,
+                "total_amount": request.data.get("totalAmount"),
+            }
+            booking = Booking.objects.create(**booking_data)
+            return JsonResponse({"message": "Payment and booking successful"}, status=status.HTTP_200_OK)
+        else:
+            return JsonResponse({"error": "Payment execution failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        
+        
 # Create booking
 class BookingCreateView(APIView):
     def post(self, request):
@@ -375,7 +466,9 @@ class CancelBookingView(APIView):
             )
         except Booking.DoesNotExist:
             return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
+
         
+    
     
 ##################################################################################### workers related views
     

@@ -19,8 +19,7 @@ urlpatterns = [
     path('services/', ServiceListCreateView.as_view(), name='service-list-create'),
     path('services/<int:pk>/', ServiceUpdateView.as_view(), name='service-update'),
     path('services/<int:pk>/', ServiceDeleteView.as_view(), name='service-delete'),
-    path('bookings/', BookingListView.as_view(), name='booking-list'),
-    path('bookings/cancel/<int:booking_id>/', CancelBookingView.as_view(), name='cancel-booking'),
+ 
 ]
    
 

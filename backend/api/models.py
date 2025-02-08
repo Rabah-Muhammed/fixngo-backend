@@ -51,17 +51,16 @@ class Slot(models.Model):
 
     class Meta:
         ordering = ['start_time']
-        unique_together = ('worker', 'start_time', 'end_time')
-        indexes = [
-            models.Index(fields=['worker', 'start_time', 'end_time']),
+        constraints = [
+            models.UniqueConstraint(fields=['worker', 'start_time', 'end_time'], name='unique_worker_slot')
         ]
+
 
     def __str__(self):
         return f"{self.worker.user.username} - {self.start_time} to {self.end_time}"
 
     
-    
-    
+
 class Booking(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),

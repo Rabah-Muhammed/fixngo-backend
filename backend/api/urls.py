@@ -1,9 +1,9 @@
 from django.urls import path
 from .views import (
-    SignupView, SlotEditView, VerifyOTPView, ResendOtpAPIView,
+    CreatePayPalOrder, ExecutePayPalPayment, ServiceDetailView, SignupView, SlotDetailView, SlotEditView, VerifyOTPView, ResendOtpAPIView,
     LoginView, ResetPasswordView, RequestPasswordResetView,
     LoginWithGoogle, UserProfileView,UserServiceListView,
-    UserServiceDetailView,ServiceWorkersView,WorkerSlotPageView,
+    UserServiceDetailView,ServiceWorkersView, WorkerDetailView,WorkerSlotPageView,
     BookingCreateView,BookingDetailView,CancelBookingView,BookingListView,
     
     WorkerSignupView, WorkerLoginView, WorkerDashboardView,
@@ -26,10 +26,16 @@ urlpatterns = [
     path('services/<int:service_id>/', UserServiceDetailView.as_view(), name='user-service-detail'),
     path("services/<int:service_id>/workers/", ServiceWorkersView.as_view(), name="service-workers"), 
     path('worker/<int:worker_id>/slots/', WorkerSlotPageView.as_view(), name='worker-slots'),
+    path('workers/<int:worker_id>/', WorkerDetailView.as_view(), name='worker-detail'),
+    path('services/<int:service_id>/', ServiceDetailView.as_view(), name='service-detail'),
+    path('slots/<int:slot_id>/', SlotDetailView.as_view(), name='slot-detail'),
     path('bookings/', BookingCreateView.as_view(), name='booking-create'),
     path('bookings/<int:booking_id>/', BookingDetailView.as_view(), name='booking-detail'),
     path("bookings/cancel/<int:booking_id>/", CancelBookingView.as_view(), name="cancel-booking"),
     path('user/bookings/', BookingListView.as_view(), name='user-bookings'),
+    path('api/paypal/create-order/', CreatePayPalOrder.as_view(), name='create_paypal_order'),
+    path('api/paypal/execute/', ExecutePayPalPayment.as_view(), name='execute_paypal_payment'),
+    
 
 
 
