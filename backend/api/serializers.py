@@ -225,3 +225,18 @@ class SlotSerializer(serializers.ModelSerializer):
 
         return data
         
+        
+class WorkerBookingSerializer(serializers.ModelSerializer):
+    service_name = serializers.CharField(source="service.name", read_only=True)
+    user_name = serializers.CharField(source="user.username", read_only=True)
+    worker_name = serializers.CharField(source="worker.user.username", read_only=True)
+    slot_time = serializers.SerializerMethodField()  #  Use SerializerMethodField
+
+    class Meta:
+        model = Booking
+        fields = ["id", "service_name", "user_name", "worker_name", "slot_time", "status"]
+
+    def get_slot_time(self, obj):
+        if obj.slot:  #  Ensure slot exists before accessing
+            return obj.slot.start_time.strftime("%Y-%m-%d %I:%M %p")  
+        return "No Slot Assigned"

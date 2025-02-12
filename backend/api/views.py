@@ -7,23 +7,27 @@ from rest_framework import permissions
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from .models import Booking, User,Worker,Slot
-from .serializers import (BookingSerializer, SlotSerializer, UserSerializer,UserProfileSerializer, WorkerSerializer,WorkerSignupSerializer,
+from .serializers import (BookingSerializer, SlotSerializer, UserSerializer,UserProfileSerializer, WorkerBookingSerializer, WorkerSerializer,WorkerSignupSerializer,
                           WorkerProfileSerializer,ServiceSerializer,WorkerServiceSerializer, WorkerSlotSerializer)
 from .tokens import CustomRefreshToken
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views import View
 from django.contrib.auth import get_user_model
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import AccessToken
 from .utils import (generate_otp, send_otp_to_email, store_otp_in_cache, 
     get_otp_from_cache,get_id_token_with_code_method_1,get_id_token_with_code_method_2)
 from .serializers import RequestPasswordResetSerializer, ResetPasswordSerializer
+from rest_framework import generics
 from django.core.cache import cache
 from django.core.mail import send_mail
 from admin_app.models import Service
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-import random
-import paypalrestsdk
 from django.conf import settings
+import paypalrestsdk
+import random
+
 
 User = get_user_model()
 
@@ -335,6 +339,14 @@ class SlotDetailView(APIView):
         except Slot.DoesNotExist:
             return Response({"error": "Slot not found"}, status=status.HTTP_404_NOT_FOUND)
 
+
+class PlatformFeeView(APIView):
+    def get(self, request):
+        try:
+            platform_fee = Booking._meta.get_field('platform_fee').default  # Fetch default value
+            return Response({"platform_fee": platform_fee}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         
 paypalrestsdk.configure({
@@ -357,7 +369,7 @@ class CreatePayPalOrder(APIView):
                     "total": str(total_amount),
                     "currency": "USD"
                 },
-                "description": "Booking Payment"
+                "description": "Platform Fee Payment"
             }],
             "redirect_urls": {
                 "return_url": "http://localhost:8000/payment/execute/",
@@ -371,6 +383,7 @@ class CreatePayPalOrder(APIView):
         else:
             return JsonResponse({"error": "Payment creation failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
 class ExecutePayPalPayment(APIView):
     def post(self, request):
         payment_id = request.data.get("paymentId")
@@ -380,21 +393,33 @@ class ExecutePayPalPayment(APIView):
 
         if payment.execute({"payer_id": payer_id}):
             # Successful payment, create booking in your DB
-            booking_data = {
-                "worker": request.data.get("worker"),
-                "slot": request.data.get("slot"),
-                "service": request.data.get("service"),
-                "payment_id": payment.id,
-                "total_amount": request.data.get("totalAmount"),
-            }
-            booking = Booking.objects.create(**booking_data)
-            return JsonResponse({"message": "Payment and booking successful"}, status=status.HTTP_200_OK)
+            worker = Worker.objects.get(id=request.data.get("worker"))
+            slot = Slot.objects.get(id=request.data.get("slot"))
+            service = Service.objects.get(id=request.data.get("service"))
+            user = request.user
+
+            total_price = service.price + 100  # Service price + Platform Fee
+            remaining_balance = total_price - 100  # Total price - Platform Fee
+            
+            booking = Booking.objects.create(
+                user=user,
+                worker=worker,
+                slot=slot,
+                service=service,
+                total_price=total_price,
+                remaining_balance=remaining_balance,
+                payment_status='fee_paid',
+                transaction_id=payment.id
+            )
+            slot.is_available = False
+            slot.save()
+            return JsonResponse({"message": "Payment and booking successful", "booking_id": booking.id}, status=status.HTTP_200_OK)
         else:
             return JsonResponse({"error": "Payment execution failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         
         
         
-# Create booking
 class BookingCreateView(APIView):
     def post(self, request):
         worker_id = request.data.get("worker")
@@ -402,7 +427,6 @@ class BookingCreateView(APIView):
         service_id = request.data.get("service")
         user = request.user
 
-        # Ensure all fields are provided
         if not worker_id or not slot_id or not service_id:
             return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -410,13 +434,16 @@ class BookingCreateView(APIView):
             worker = Worker.objects.get(id=worker_id)
             slot = Slot.objects.get(id=slot_id, is_available=True)
             service = Service.objects.get(id=service_id)
+            
+            total_price = service.price + 100
+            remaining_balance = total_price - 100
 
-            # Create the booking
-            booking = Booking.objects.create(user=user, worker=worker, slot=slot, service=service, status="Confirmed")
-            slot.is_available = False
-            slot.save()
-
-            return Response({"message": "Booking successful", "booking_id": booking.id}, status=status.HTTP_201_CREATED)
+            booking = Booking.objects.create(
+                user=user, worker=worker, slot=slot, service=service,
+                total_price=total_price, remaining_balance=remaining_balance,
+                status="pending", payment_status="fee_paid"
+            )
+            return Response({"message": "Booking created successfully", "booking_id": booking.id}, status=status.HTTP_201_CREATED)
 
         except Worker.DoesNotExist:
             return Response({"error": "Worker not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -445,27 +472,34 @@ class BookingDetailView(APIView):
 
 
 class CancelBookingView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def patch(self, request, booking_id):
         try:
-            # Get the booking
             booking = Booking.objects.get(id=booking_id)
 
-            # Update booking status to 'cancelled'
-            booking.status = 'cancelled'
+            # Ensure only the user who made the booking can cancel it
+            if booking.user != request.user:
+                return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+
+            booking.status = "cancelled"
+            booking.payment_status = "completed"
             booking.save()
 
-            # Find the related slot and mark it as available
             slot = booking.slot
-            slot.is_booked = False
             slot.is_available = True
             slot.save()
 
             return Response(
-                {"message": "Booking canceled successfully", "status": "cancelled"},
+                {"message": "Booking canceled successfully", "status": booking.status},
                 status=status.HTTP_200_OK,
             )
+
         except Booking.DoesNotExist:
             return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+
 
         
     
@@ -682,3 +716,53 @@ class SlotDeleteView(APIView):
 
         slot.delete()
         return Response({"message": "Slot deleted successfully."}, status=204)
+    
+    
+class WorkerBookingListView(generics.ListAPIView):
+    serializer_class = WorkerBookingSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Booking.objects.filter(worker=self.request.user.worker_profile, status="pending")
+
+
+class WorkerBookingUpdateView(generics.UpdateAPIView):
+    serializer_class = WorkerBookingSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        try:
+            booking = Booking.objects.get(pk=pk, worker=request.user.worker_profile)
+            status_choice = request.data.get("status")
+
+            if status_choice in ["processing", "cancelled"]:  
+                booking.status = status_choice
+                booking.save()
+                return Response({"message": "Booking updated successfully", "status": booking.status})
+            return Response({"error": "Invalid status choice"}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Booking.DoesNotExist:
+            return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        
+        
+class WorkerManageBookingsView(generics.ListAPIView):
+    serializer_class = WorkerBookingSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Booking.objects.filter(worker=self.request.user.worker_profile, status="processing")
+
+
+class WorkerCompleteBookingView(generics.UpdateAPIView):
+    serializer_class = WorkerBookingSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        try:
+            booking = Booking.objects.get(pk=pk, worker=request.user.worker_profile, status="processing")
+            booking.status = "workdone"
+            booking.save()
+            return Response({"message": "Booking marked as completed", "status": booking.status})
+        except Booking.DoesNotExist:
+            return Response({"error": "Booking not found or not in processing status"}, status=status.HTTP_404_NOT_FOUND)

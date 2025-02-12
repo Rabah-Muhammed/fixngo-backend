@@ -64,16 +64,34 @@ class Slot(models.Model):
 class Booking(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
-        ('confirmed', 'Confirmed'),
+        ('processing', 'Processing'),
+        ('workdone', 'Work Done'),
         ('cancelled', 'Cancelled'),
+        ('completed', 'Completed'),
     )
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    worker = models.ForeignKey(Worker, on_delete=models.CASCADE)
-    service = models.ForeignKey(Service, on_delete=models.CASCADE)
-    slot = models.ForeignKey(Slot, on_delete=models.CASCADE)
+    PAYMENT_STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('fee_paid', 'Fee Paid'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+        ('refunded', 'Refunded'),
+    )
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="user_bookings")
+    worker = models.ForeignKey(Worker, on_delete=models.CASCADE, related_name="worker_bookings")
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="service_bookings")
+    slot = models.ForeignKey(Slot, on_delete=models.CASCADE, related_name="slot_bookings")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    payment_status = models.CharField(max_length=10, choices=PAYMENT_STATUS_CHOICES, default='pending')
+    total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    platform_fee = models.DecimalField(max_digits=10, decimal_places=2, default=10.00)
+    remaining_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    transaction_id = models.CharField(max_length=100, blank=True, null=True, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Booking by {self.user.username} with {self.worker.user.username} for {self.service.name}"
+            return f"Booking #{self.id} - {self.user.username} with {self.worker.user.username}"
+
+

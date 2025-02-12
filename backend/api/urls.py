@@ -1,14 +1,17 @@
 from django.urls import path
 from .views import (
-    CreatePayPalOrder, ExecutePayPalPayment, ServiceDetailView, SignupView, SlotDetailView, SlotEditView, VerifyOTPView, ResendOtpAPIView,
+    CreatePayPalOrder, ExecutePayPalPayment, PlatformFeeView, 
+    ServiceDetailView, SignupView, SlotDetailView, SlotEditView, VerifyOTPView, ResendOtpAPIView,
     LoginView, ResetPasswordView, RequestPasswordResetView,
     LoginWithGoogle, UserProfileView,UserServiceListView,
-    UserServiceDetailView,ServiceWorkersView, WorkerDetailView,WorkerSlotPageView,
+    UserServiceDetailView,ServiceWorkersView,
     BookingCreateView,BookingDetailView,CancelBookingView,BookingListView,
     
     WorkerSignupView, WorkerLoginView, WorkerDashboardView,
     WorkerProfileView, WorkerServicesView, WorkerServiceUpdateView,
-    SlotListCreateView,SlotDeleteView
+    SlotListCreateView,SlotDeleteView, WorkerBookingListView, WorkerBookingUpdateView,
+    WorkerCompleteBookingView, WorkerManageBookingsView, 
+    WorkerDetailView,WorkerSlotPageView,
     
 )
 
@@ -29,6 +32,7 @@ urlpatterns = [
     path('workers/<int:worker_id>/', WorkerDetailView.as_view(), name='worker-detail'),
     path('services/<int:service_id>/', ServiceDetailView.as_view(), name='service-detail'),
     path('slots/<int:slot_id>/', SlotDetailView.as_view(), name='slot-detail'),
+    path("platform-fee/", PlatformFeeView.as_view(), name="platform-fee"),
     path('bookings/', BookingCreateView.as_view(), name='booking-create'),
     path('bookings/<int:booking_id>/', BookingDetailView.as_view(), name='booking-detail'),
     path("bookings/cancel/<int:booking_id>/", CancelBookingView.as_view(), name="cancel-booking"),
@@ -36,6 +40,7 @@ urlpatterns = [
     path('api/paypal/create-order/', CreatePayPalOrder.as_view(), name='create_paypal_order'),
     path('api/paypal/execute/', ExecutePayPalPayment.as_view(), name='execute_paypal_payment'),
     
+   
 
 
 
@@ -49,4 +54,11 @@ urlpatterns = [
     path('worker/slots/', SlotListCreateView.as_view(), name='worker_slots'),
     path('worker/slot/edit/<int:slot_id>/', SlotEditView.as_view(), name='slot-edit'),
     path('worker/slot/delete/<int:slot_id>/', SlotDeleteView.as_view(), name='slot-delete'),
+    path("worker/bookings/", WorkerBookingListView.as_view(), name="worker-bookings"),
+    path("worker/bookings/<int:pk>/", WorkerBookingUpdateView.as_view(), name="worker-booking-update"),
+    path("worker/manage-bookings/", WorkerManageBookingsView.as_view(), name="worker-manage-bookings"),
+    path("worker/bookings/<int:pk>/complete/", WorkerCompleteBookingView.as_view(), name="worker-complete-booking"),
+    
 ]
+   
+    
