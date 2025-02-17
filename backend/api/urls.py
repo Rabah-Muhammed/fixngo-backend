@@ -1,17 +1,22 @@
 from django.urls import path
 from .views import (
-    CreatePayPalOrder, ExecutePayPalPayment, PlatformFeeView, 
-    ServiceDetailView, SignupView, SlotDetailView, SlotEditView, VerifyOTPView, ResendOtpAPIView,
+    CreatePayPalOrder, ExecutePayPalPayment, PlatformFeeView, ReviewView,
+    ServiceDetailView, ServiceReviewsAPIView, SignupView, SlotDetailView, SlotEditView, 
+    UserBookingsView, VerifyOTPView, ResendOtpAPIView,
     LoginView, ResetPasswordView, RequestPasswordResetView,
     LoginWithGoogle, UserProfileView,UserServiceListView,
     UserServiceDetailView,ServiceWorkersView,
-    BookingCreateView,BookingDetailView,CancelBookingView,BookingListView,
+    BookingCreateView,BookingDetailView,CancelBookingView,
+    BookingListView, PayRemainingBalanceView, WorkerReviewsView,
+
+    
+    
     
     WorkerSignupView, WorkerLoginView, WorkerDashboardView,
     WorkerProfileView, WorkerServicesView, WorkerServiceUpdateView,
     SlotListCreateView,SlotDeleteView, WorkerBookingListView, WorkerBookingUpdateView,
     WorkerCompleteBookingView, WorkerManageBookingsView, 
-    WorkerDetailView,WorkerSlotPageView,
+    WorkerDetailView,WorkerSlotPageView, 
     
 )
 
@@ -32,6 +37,7 @@ urlpatterns = [
     path('workers/<int:worker_id>/', WorkerDetailView.as_view(), name='worker-detail'),
     path('services/<int:service_id>/', ServiceDetailView.as_view(), name='service-detail'),
     path('slots/<int:slot_id>/', SlotDetailView.as_view(), name='slot-detail'),
+    path('workers/<int:worker_id>/reviews/', WorkerReviewsView.as_view(), name='worker_reviews'),
     path("platform-fee/", PlatformFeeView.as_view(), name="platform-fee"),
     path('bookings/', BookingCreateView.as_view(), name='booking-create'),
     path('bookings/<int:booking_id>/', BookingDetailView.as_view(), name='booking-detail'),
@@ -39,9 +45,14 @@ urlpatterns = [
     path('user/bookings/', BookingListView.as_view(), name='user-bookings'),
     path('api/paypal/create-order/', CreatePayPalOrder.as_view(), name='create_paypal_order'),
     path('api/paypal/execute/', ExecutePayPalPayment.as_view(), name='execute_paypal_payment'),
-    
-   
+    path("user/bookings/", UserBookingsView.as_view(), name="user-bookings"),
+    path('bookings/<int:booking_id>/pay-remaining/', PayRemainingBalanceView.as_view(), name='pay_remaining_balance'),
+    path("reviews/booking/<int:booking_id>/", ReviewView.as_view(), name="get_review"),
+    path("reviews/", ReviewView.as_view(), name="create_review"),
+    path("reviews/<int:review_id>/", ReviewView.as_view(), name="update_review"),
+    path("services/<int:service_id>/reviews/", ServiceReviewsAPIView.as_view(), name="service-reviews"),
 
+    
 
 
     # Worker endpoints
@@ -58,6 +69,7 @@ urlpatterns = [
     path("worker/bookings/<int:pk>/", WorkerBookingUpdateView.as_view(), name="worker-booking-update"),
     path("worker/manage-bookings/", WorkerManageBookingsView.as_view(), name="worker-manage-bookings"),
     path("worker/bookings/<int:pk>/complete/", WorkerCompleteBookingView.as_view(), name="worker-complete-booking"),
+    
     
 ]
    

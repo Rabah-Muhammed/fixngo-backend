@@ -6,8 +6,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework import permissions
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from .models import Booking, User,Worker,Slot
-from .serializers import (BookingSerializer, SlotSerializer, UserSerializer,UserProfileSerializer, WorkerBookingSerializer, WorkerSerializer,WorkerSignupSerializer,
+from .models import Booking, Review, User,Worker,Slot
+from .serializers import (BookingSerializer, ReviewSerializer, SlotSerializer, UserSerializer,UserProfileSerializer, WorkerBookingSerializer, WorkerSerializer,WorkerSignupSerializer,
                           WorkerProfileSerializer,ServiceSerializer,WorkerServiceSerializer, WorkerSlotSerializer)
 from .tokens import CustomRefreshToken
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -26,6 +26,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.conf import settings
 import paypalrestsdk
+from decimal import Decimal
 import random
 
 
@@ -334,10 +335,17 @@ class SlotDetailView(APIView):
     def get(self, request, slot_id):
         try:
             slot = Slot.objects.get(id=slot_id)
-            serializer = SlotSerializer(slot)
+            serializer = WorkerSlotSerializer(slot)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Slot.DoesNotExist:
             return Response({"error": "Slot not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        
+class WorkerReviewsView(APIView):
+    def get(self, request, worker_id):
+        reviews = Review.objects.filter(worker_id=worker_id)
+        serializer = ReviewSerializer(reviews, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class PlatformFeeView(APIView):
@@ -389,18 +397,29 @@ class ExecutePayPalPayment(APIView):
         payment_id = request.data.get("paymentId")
         payer_id = request.data.get("payerId")
 
+        # Find the PayPal payment
         payment = paypalrestsdk.Payment.find(payment_id)
 
+        print(f"Payment found: {payment}")  # Debugging line
+
+        # Execute the PayPal payment
         if payment.execute({"payer_id": payer_id}):
-            # Successful payment, create booking in your DB
+            print(f"Transaction ID after execution: {payment.id}")  # Debugging line
+            
+            # Fetch the worker, slot, and service objects
             worker = Worker.objects.get(id=request.data.get("worker"))
             slot = Slot.objects.get(id=request.data.get("slot"))
             service = Service.objects.get(id=request.data.get("service"))
             user = request.user
 
-            total_price = service.price + 100  # Service price + Platform Fee
-            remaining_balance = total_price - 100  # Total price - Platform Fee
+            # Default platform fee (or from the service object)
+            platform_fee = getattr(service, 'platform_fee', 10)  # Default to 10 if not set
             
+            # Calculate total price and remaining balance
+            total_price = service.hourly_rate + platform_fee
+            remaining_balance = total_price - platform_fee
+
+            # Create a new booking object
             booking = Booking.objects.create(
                 user=user,
                 worker=worker,
@@ -408,15 +427,20 @@ class ExecutePayPalPayment(APIView):
                 service=service,
                 total_price=total_price,
                 remaining_balance=remaining_balance,
+                platform_fee=platform_fee,  
                 payment_status='fee_paid',
-                transaction_id=payment.id
+                transaction_id=payment.id  # Storing the PayPal transaction ID
             )
-            slot.is_available = False
+
+            # Update slot booking status
+            slot.is_booked = True
             slot.save()
+
             return JsonResponse({"message": "Payment and booking successful", "booking_id": booking.id}, status=status.HTTP_200_OK)
         else:
-            return JsonResponse({"error": "Payment execution failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+            # Debugging: Check if payment execution failed and print the error
+            print(f"Payment execution failed: {payment.error}")  # Debugging line
+            return JsonResponse({"error": "Payment execution failed", "details": payment.error}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         
         
@@ -431,27 +455,41 @@ class BookingCreateView(APIView):
             return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            worker = Worker.objects.get(id=worker_id)
-            slot = Slot.objects.get(id=slot_id, is_available=True)
-            service = Service.objects.get(id=service_id)
-            
-            total_price = service.price + 100
-            remaining_balance = total_price - 100
+            worker = get_object_or_404(Worker, id=worker_id)
+            slot = get_object_or_404(Slot, id=slot_id, is_booked=False)  # Ensure slot isn't already booked
+            service = get_object_or_404(Service, id=service_id)
+
+            platform_fee = Decimal(getattr(service, 'platform_fee', 10))  # Ensure platform_fee is Decimal
+
+            # Convert duration to Decimal to avoid TypeError
+            duration = Decimal((slot.end_time - slot.start_time).total_seconds()) / Decimal(3600)
+
+            # Calculate total price correctly using Decimal
+            total_price = service.hourly_rate * duration + platform_fee
+
+            # Remaining balance should be total price minus platform fee
+            remaining_balance = total_price - platform_fee
 
             booking = Booking.objects.create(
-                user=user, worker=worker, slot=slot, service=service,
-                total_price=total_price, remaining_balance=remaining_balance,
-                status="pending", payment_status="fee_paid"
+                user=user, 
+                worker=worker, 
+                slot=slot, 
+                service=service,
+                total_price=total_price, 
+                remaining_balance=remaining_balance,
+                platform_fee=platform_fee,  
+                status="pending", 
+                payment_status="fee_paid"
             )
-            return Response({"message": "Booking created successfully", "booking_id": booking.id}, status=status.HTTP_201_CREATED)
 
-        except Worker.DoesNotExist:
-            return Response({"error": "Worker not found"}, status=status.HTTP_404_NOT_FOUND)
-        except Slot.DoesNotExist:
-            return Response({"error": "Slot not available or does not exist"}, status=status.HTTP_404_NOT_FOUND)
-        except Service.DoesNotExist:
-            return Response({"error": "Service not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({
+                "message": "Booking created successfully",
+                "booking_id": booking.id,
+                "remaining_balance": str(remaining_balance)  # Ensure JSON-safe response
+            }, status=status.HTTP_201_CREATED)
 
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class BookingListView(APIView):
@@ -483,7 +521,7 @@ class CancelBookingView(APIView):
                 return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
 
             booking.status = "cancelled"
-            booking.payment_status = "completed"
+            # booking.payment_status = "completed" ################# error
             booking.save()
 
             slot = booking.slot
@@ -497,13 +535,99 @@ class CancelBookingView(APIView):
 
         except Booking.DoesNotExist:
             return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
-
-
-
-
         
-    
-    
+        
+class UserBookingsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        bookings = Booking.objects.filter(user=request.user).order_by("-id")
+        serializer = BookingSerializer(bookings, many=True)
+        return Response(serializer.data)
+
+class PayRemainingBalanceView(APIView):
+    def patch(self, request, booking_id):
+        try:
+            booking = Booking.objects.get(id=booking_id)
+
+            # Assuming the service price is part of the booking
+            if booking.status == 'completed':
+                return Response({"detail": "Booking already completed."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Update the booking status and payment status
+            booking.status = 'completed'  # or whatever status is appropriate
+            booking.payment_status = 'completed'  # Assuming this field exists
+            booking.save()
+
+            return Response({"detail": "Remaining balance paid, booking is now completed."}, status=status.HTTP_200_OK)
+        except Booking.DoesNotExist:
+            return Response({"detail": "Booking not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        
+
+class ReviewView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, booking_id):
+        """Retrieve review for a specific booking (if exists)."""
+        try:
+            review = Review.objects.get(booking_id=booking_id, user=request.user)
+            return Response(ReviewSerializer(review).data, status=status.HTTP_200_OK)
+        except Review.DoesNotExist:
+            return Response({"message": "No review found"}, status=status.HTTP_404_NOT_FOUND)
+
+    def post(self, request):
+        """Create a new review."""
+        booking_id = request.data.get("booking_id")
+        rating = request.data.get("rating")
+        review_text = request.data.get("review")
+
+        if not booking_id or not rating:
+            return Response({"error": "Booking ID and rating are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            booking = Booking.objects.get(id=booking_id, user=request.user, status="completed")
+            if Review.objects.filter(booking=booking).exists():
+                return Response({"error": "Review already exists for this booking"}, status=status.HTTP_400_BAD_REQUEST)
+
+            review = Review.objects.create(
+                user=request.user,
+                worker=booking.worker,
+                booking=booking,
+                rating=rating,
+                review=review_text
+            )
+            return Response(ReviewSerializer(review).data, status=status.HTTP_201_CREATED)
+        except Booking.DoesNotExist:
+            return Response({"error": "Booking not found or not completed"}, status=status.HTTP_404_NOT_FOUND)
+
+    def put(self, request, review_id):
+        """Update an existing review."""
+        try:
+            review = Review.objects.get(id=review_id, user=request.user)
+            review.rating = request.data.get("rating", review.rating)
+            review.review = request.data.get("review", review.review)
+            review.save()
+            return Response(ReviewSerializer(review).data, status=status.HTTP_200_OK)
+        except Review.DoesNotExist:
+            return Response({"error": "Review not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        
+        
+class ServiceReviewsAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, service_id):
+        try:
+            reviews = Review.objects.filter(booking__service__id=service_id)
+            serializer = ReviewSerializer(reviews, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Service.DoesNotExist:
+            return Response({"error": "Service not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+
 ##################################################################################### workers related views
     
 
@@ -760,9 +884,40 @@ class WorkerCompleteBookingView(generics.UpdateAPIView):
 
     def patch(self, request, pk):
         try:
-            booking = Booking.objects.get(pk=pk, worker=request.user.worker_profile, status="processing")
+            booking = get_object_or_404(Booking, pk=pk, worker=request.user.worker_profile, status="processing")
+
+            # Get hours worked from request
+            hours_worked = request.data.get("hours_worked")
+            if hours_worked is None or float(hours_worked) <= 0:
+                return Response({"error": "Invalid hours worked"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Validate hours worked against slot duration
+            slot_duration = (booking.slot.end_time - booking.slot.start_time).total_seconds() / 3600  # Convert to hours
+            if float(hours_worked) > slot_duration:
+                return Response({"error": f"Hours worked cannot exceed slot duration ({slot_duration:.2f} hours)"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Calculate total charge based on hours worked
+            hourly_rate = float(booking.service.hourly_rate)  # Using 'hourly_rate' as the hourly rate
+            total_price = float(hours_worked) * hourly_rate
+
+            # Update booking details with the new total price
+            booking.remaining_balance = total_price
             booking.status = "workdone"
             booking.save()
-            return Response({"message": "Booking marked as completed", "status": booking.status})
+
+            # Mark the slot as unavailable since work is done
+            if booking.slot:
+                booking.slot.is_available = False
+                booking.slot.save()
+
+            return Response({
+                "message": "Booking marked as completed",
+                "status": booking.status,
+                "remaining_balance": total_price
+            })
+
         except Booking.DoesNotExist:
             return Response({"error": "Booking not found or not in processing status"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

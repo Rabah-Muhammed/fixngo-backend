@@ -95,3 +95,16 @@ class Booking(models.Model):
             return f"Booking #{self.id} - {self.user.username} with {self.worker.user.username}"
 
 
+        
+
+class Review(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    worker = models.ForeignKey(Worker, on_delete=models.CASCADE)
+    booking = models.OneToOneField(Booking, on_delete=models.CASCADE)
+    rating = models.IntegerField(default=0)
+    review = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Review by {self.user.email} for {self.worker.user.email}"
+

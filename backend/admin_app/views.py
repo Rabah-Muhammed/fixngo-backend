@@ -209,29 +209,26 @@ class ServiceListCreateView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
 
-class ServiceDeleteView(APIView):
-    def delete(self, request, pk):
-        try:
-            service = Service.objects.get(pk=pk)
-            service.delete()
-            return Response({"message": "Service deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
-        except Service.DoesNotExist:
-            return Response({"error": "Service not found."}, status=status.HTTP_404_NOT_FOUND)
-        
-
-class ServiceUpdateView(APIView):
+class ServiceUpdateDeleteView(APIView):
     permission_classes = [IsAuthenticated]
 
     def put(self, request, pk):
         try:
             service = Service.objects.get(pk=pk)
-            serializer = ServiceSerializer(service, data=request.data, partial=True)  # Use partial update for PUT
+            serializer = ServiceSerializer(service, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_200_OK)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Service.DoesNotExist:
+            return Response({"error": "Service not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request, pk):
+        try:
+            service = Service.objects.get(pk=pk)
+            service.delete()
+            return Response({"message": "Service deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
         except Service.DoesNotExist:
             return Response({"error": "Service not found."}, status=status.HTTP_404_NOT_FOUND)
         

@@ -7,7 +7,7 @@ from api.models import Booking,User
 class ServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
-        fields = '__all__'
+        fields = ['id', 'name', 'description', 'hourly_rate', 'image', 'created_at', 'updated_at']
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:

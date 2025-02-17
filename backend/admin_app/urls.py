@@ -1,9 +1,10 @@
 # admin_app/urls.py
 from django.urls import path
-from .views import (AdminLoginView,AdminDashboardView, BookingListView, CancelBookingView, ServiceUpdateView,UsersListView,BlockUserView,
+from .views import (AdminLoginView,AdminDashboardView, BookingListView, CancelBookingView, 
+                    ServiceUpdateDeleteView,UsersListView,BlockUserView,
                     UnblockUserView,DeleteUserView,WorkersListView,BlockWorkerView,
                     UnblockWorkerView,DeleteWorkerView,ServiceListCreateView,
-                    ServiceDeleteView)
+                    )
 
 urlpatterns = [
     path('login/', AdminLoginView.as_view(), name='admin-login'),  # Admin login endpoint
@@ -17,9 +18,8 @@ urlpatterns = [
     path("unblock/<int:worker_id>/", UnblockWorkerView.as_view(), name="unblock-worker"),
     path("delete/<int:worker_id>/", DeleteWorkerView.as_view(), name="delete-worker"),
     path('services/', ServiceListCreateView.as_view(), name='service-list-create'),
-    path('services/<int:pk>/', ServiceUpdateView.as_view(), name='service-update'),
-    path('services/<int:pk>/', ServiceDeleteView.as_view(), name='service-delete'),
- 
+    path('services/<int:pk>/', ServiceUpdateDeleteView.as_view(), name='service-update-delete'),
+    
 ]
    
 
