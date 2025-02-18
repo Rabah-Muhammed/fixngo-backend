@@ -78,10 +78,10 @@ class Booking(models.Model):
         ('refunded', 'Refunded'),
     )
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="user_bookings")
-    worker = models.ForeignKey(Worker, on_delete=models.CASCADE, related_name="worker_bookings")
-    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="service_bookings")
-    slot = models.ForeignKey(Slot, on_delete=models.CASCADE, related_name="slot_bookings")
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="user_bookings")
+    worker = models.ForeignKey(Worker, on_delete=models.SET_NULL, null=True, blank=True, related_name="worker_bookings")
+    service = models.ForeignKey(Service, on_delete=models.SET_NULL, null=True, blank=True, related_name="service_bookings")
+    slot = models.ForeignKey(Slot, on_delete=models.SET_NULL, null=True, blank=True, related_name="slot_bookings")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     payment_status = models.CharField(max_length=10, choices=PAYMENT_STATUS_CHOICES, default='pending')
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)

@@ -7,10 +7,11 @@ from django.contrib.auth import authenticate
 from .tokens import CustomRefreshToken
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from api.models import Booking, User, Worker
-from .serializers import BookingSerializer, ServiceSerializer
+from api.models import Booking, Review, User, Worker
+from .serializers import BookingSerializer, ReviewSerializer, ServiceSerializer
 from .models import Service
 from django.core.paginator import Paginator
+from rest_framework import generics
 from rest_framework.parsers import MultiPartParser, FormParser
 
 
@@ -233,25 +234,50 @@ class ServiceUpdateDeleteView(APIView):
             return Response({"error": "Service not found."}, status=status.HTTP_404_NOT_FOUND)
         
         
-class BookingListView(APIView):
+
+class AdminBookingListView(APIView):
     def get(self, request):
         bookings = Booking.objects.all()
         serializer = BookingSerializer(bookings, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.data)
     
     
 class CancelBookingView(APIView):
-
     def post(self, request, booking_id):
         try:
+            # Get the booking by ID
             booking = Booking.objects.get(id=booking_id)
-            if booking.status == 'cancelled':
-                return Response({'detail': 'This booking has already been cancelled.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if the status is 'pending'
+            if booking.status != 'pending':
+                return Response(
+                    {"error": "Only pending bookings can be cancelled."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-            booking.status = 'cancelled'  # Directly set to 'cancelled'
+            # Change the booking status to 'cancelled'
+            booking.status = 'cancelled'
             booking.save()
 
-            return Response({'detail': 'Booking cancelled successfully.'}, status=status.HTTP_200_OK)
+            return Response(
+                {"message": "Booking cancelled successfully."},
+                status=status.HTTP_200_OK
+            )
 
         except Booking.DoesNotExist:
-            return Response({'detail': 'Booking not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Booking not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        
+class ReviewListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        try:
+            reviews = Review.objects.all()
+            serializer = ReviewSerializer(reviews, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

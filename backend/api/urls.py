@@ -16,7 +16,7 @@ from .views import (
     WorkerProfileView, WorkerServicesView, WorkerServiceUpdateView,
     SlotListCreateView,SlotDeleteView, WorkerBookingListView, WorkerBookingUpdateView,
     WorkerCompleteBookingView, WorkerManageBookingsView, 
-    WorkerDetailView,WorkerSlotPageView, 
+    WorkerDetailView,WorkerSlotPageView,WorkerReviewListView
     
 )
 
@@ -45,10 +45,10 @@ urlpatterns = [
     path('user/bookings/', BookingListView.as_view(), name='user-bookings'),
     path('api/paypal/create-order/', CreatePayPalOrder.as_view(), name='create_paypal_order'),
     path('api/paypal/execute/', ExecutePayPalPayment.as_view(), name='execute_paypal_payment'),
-    path("user/bookings/", UserBookingsView.as_view(), name="user-bookings"),
+    path('user/bookings/', UserBookingsView.as_view(), name='user-bookings'),
     path('bookings/<int:booking_id>/pay-remaining/', PayRemainingBalanceView.as_view(), name='pay_remaining_balance'),
-    path("reviews/booking/<int:booking_id>/", ReviewView.as_view(), name="get_review"),
     path("reviews/", ReviewView.as_view(), name="create_review"),
+    path("reviews/booking/<int:booking_id>/", ReviewView.as_view(), name="get_review_for_booking"),
     path("reviews/<int:review_id>/", ReviewView.as_view(), name="update_review"),
     path("services/<int:service_id>/reviews/", ServiceReviewsAPIView.as_view(), name="service-reviews"),
 
@@ -69,7 +69,7 @@ urlpatterns = [
     path("worker/bookings/<int:pk>/", WorkerBookingUpdateView.as_view(), name="worker-booking-update"),
     path("worker/manage-bookings/", WorkerManageBookingsView.as_view(), name="worker-manage-bookings"),
     path("worker/bookings/<int:pk>/complete/", WorkerCompleteBookingView.as_view(), name="worker-complete-booking"),
-    
+    path("worker/reviews/", WorkerReviewListView.as_view(), name="worker-reviews"),
     
 ]
    

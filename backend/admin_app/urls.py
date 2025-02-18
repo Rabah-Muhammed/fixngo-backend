@@ -1,6 +1,6 @@
 # admin_app/urls.py
 from django.urls import path
-from .views import (AdminLoginView,AdminDashboardView, BookingListView, CancelBookingView, 
+from .views import (AdminBookingListView, AdminLoginView,AdminDashboardView, CancelBookingView,ReviewListView, 
                     ServiceUpdateDeleteView,UsersListView,BlockUserView,
                     UnblockUserView,DeleteUserView,WorkersListView,BlockWorkerView,
                     UnblockWorkerView,DeleteWorkerView,ServiceListCreateView,
@@ -19,6 +19,9 @@ urlpatterns = [
     path("delete/<int:worker_id>/", DeleteWorkerView.as_view(), name="delete-worker"),
     path('services/', ServiceListCreateView.as_view(), name='service-list-create'),
     path('services/<int:pk>/', ServiceUpdateDeleteView.as_view(), name='service-update-delete'),
+    path('reviews/', ReviewListView.as_view(), name='review-list'),
+    path('bookings/', AdminBookingListView.as_view(), name='admin-bookings'),
+    path('bookings/cancel/<int:booking_id>/', CancelBookingView.as_view(), name='cancel-booking'),
     
 ]
    

@@ -23,6 +23,7 @@ from django.core.cache import cache
 from django.core.mail import send_mail
 from admin_app.models import Service
 from django.shortcuts import get_object_or_404
+from rest_framework.pagination import LimitOffsetPagination
 from django.utils import timezone
 from django.conf import settings
 import paypalrestsdk
@@ -481,6 +482,9 @@ class BookingCreateView(APIView):
                 status="pending", 
                 payment_status="fee_paid"
             )
+            
+            slot.is_available = False
+            slot.save()
 
             return Response({
                 "message": "Booking created successfully",
@@ -612,7 +616,7 @@ class ReviewView(APIView):
         except Review.DoesNotExist:
             return Response({"error": "Review not found"}, status=status.HTTP_404_NOT_FOUND)
         
-        
+
         
 class ServiceReviewsAPIView(APIView):
     permission_classes = [AllowAny]
@@ -629,6 +633,7 @@ class ServiceReviewsAPIView(APIView):
 
 
 ##################################################################################### workers related views
+    
     
 
 class WorkerSignupView(APIView):
@@ -921,3 +926,13 @@ class WorkerCompleteBookingView(generics.UpdateAPIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+
+class WorkerReviewListView(generics.ListAPIView):
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Fetch reviews for the authenticated worker
+        worker = self.request.user.worker_profile
+        return Review.objects.filter(worker=worker)

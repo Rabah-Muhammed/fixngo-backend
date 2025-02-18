@@ -1,7 +1,7 @@
 # backend/api/views.py
 from rest_framework import serializers
 from .models import Service
-from api.models import Booking,User
+from api.models import Booking,User,Review,Worker
 
 
 class ServiceSerializer(serializers.ModelSerializer):
@@ -27,3 +27,13 @@ class BookingSerializer(serializers.ModelSerializer):
         if 'created_at' in representation:
             representation['created_at'] = instance.created_at.strftime('%Y-%m-%d %H:%M:%S')  # Format date
         return representation
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+    user = serializers.SlugRelatedField(slug_field='username', queryset=User.objects.all())
+    worker = serializers.SlugRelatedField(slug_field='user__username', queryset=Worker.objects.all())
+    service_name = serializers.CharField(source='booking.service.name', read_only=True)  # Added service_name
+
+    class Meta:
+        model = Review
+        fields = ['id', 'user', 'worker', 'rating', 'review', 'service_name', 'booking', 'created_at']
