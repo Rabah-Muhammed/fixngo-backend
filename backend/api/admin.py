@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User,Worker,Slot,Booking,Review
+from .models import User,Worker,Slot,Booking,Review,RoomMember
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
@@ -22,3 +22,4 @@ class SlotAdmin(admin.ModelAdmin):
 
 admin.site.register(Booking)
 admin.site.register(Review)
+admin.site.register(RoomMember)

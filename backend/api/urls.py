@@ -1,13 +1,13 @@
 from django.urls import path
 from .views import (
-    CreatePayPalOrder, ExecutePayPalPayment, PlatformFeeView, ReviewView,
-    ServiceDetailView, ServiceReviewsAPIView, SignupView, SlotDetailView, SlotEditView, 
-    UserBookingsView, VerifyOTPView, ResendOtpAPIView,
+    CreateMemberView, CreatePayPalOrder, DeleteMemberView, ExecutePayPalPayment, GetMemberView, GetTokenView,
+    PlatformFeeView, ReviewView,ServiceDetailView, ServiceReviewsAPIView, SignupView,
+    SlotDetailView, SlotEditView, UserBookingsView, VerifyOTPView, ResendOtpAPIView,
     LoginView, ResetPasswordView, RequestPasswordResetView,
     LoginWithGoogle, UserProfileView,UserServiceListView,
     UserServiceDetailView,ServiceWorkersView,
-    BookingCreateView,BookingDetailView,CancelBookingView,
-    BookingListView, PayRemainingBalanceView, WorkerReviewsView,
+    BookingCreateView,BookingDetailView,CancelBookingView,BookingListView, 
+    PayRemainingBalanceView, VisitWorkerProfileView, WorkerReviewsView,
 
     
     
@@ -16,7 +16,7 @@ from .views import (
     WorkerProfileView, WorkerServicesView, WorkerServiceUpdateView,
     SlotListCreateView,SlotDeleteView, WorkerBookingListView, WorkerBookingUpdateView,
     WorkerCompleteBookingView, WorkerManageBookingsView, 
-    WorkerDetailView,WorkerSlotPageView,WorkerReviewListView
+    WorkerDetailView,WorkerSlotPageView,WorkerReviewListView,
     
 )
 
@@ -34,6 +34,7 @@ urlpatterns = [
     path('services/<int:service_id>/', UserServiceDetailView.as_view(), name='user-service-detail'),
     path("services/<int:service_id>/workers/", ServiceWorkersView.as_view(), name="service-workers"), 
     path('worker/<int:worker_id>/slots/', WorkerSlotPageView.as_view(), name='worker-slots'),
+    path('worker/<int:pk>/', VisitWorkerProfileView.as_view(), name="visit_worker_profile"),
     path('workers/<int:worker_id>/', WorkerDetailView.as_view(), name='worker-detail'),
     path('services/<int:service_id>/', ServiceDetailView.as_view(), name='service-detail'),
     path('slots/<int:slot_id>/', SlotDetailView.as_view(), name='slot-detail'),
@@ -51,8 +52,10 @@ urlpatterns = [
     path("reviews/booking/<int:booking_id>/", ReviewView.as_view(), name="get_review_for_booking"),
     path("reviews/<int:review_id>/", ReviewView.as_view(), name="update_review"),
     path("services/<int:service_id>/reviews/", ServiceReviewsAPIView.as_view(), name="service-reviews"),
-
-    
+    path('get_token/', GetTokenView.as_view()),
+    path('create_member/', CreateMemberView.as_view()),
+    path('get_member/', GetMemberView.as_view()),
+    path('delete_member/', DeleteMemberView.as_view()),
 
 
     # Worker endpoints

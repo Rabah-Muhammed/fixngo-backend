@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import serializers
 from .models import Booking, Review,User,Worker,Slot
 from admin_app.models import Service
@@ -115,6 +116,26 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     def get_worker_name(self, obj):
         return obj.worker.user.username if obj.worker.user.username else "Anonymous Worker"
+
+
+class VisitWorkerProfileSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    username = serializers.CharField(source="user.username", read_only=True)
+    phone_number = serializers.CharField(source="user.phone_number", read_only=True)
+    profile_picture = serializers.SerializerMethodField()
+    gender = serializers.CharField(source="user.gender", read_only=True)
+
+    class Meta:
+        model = Worker
+        fields = [
+            "id", "username", "user_email", "phone_number", "profile_picture", "gender",
+            "service_area", "availability_status", "completed_jobs"
+        ]
+
+    def get_profile_picture(self, obj):
+        if obj.user.profile_picture:
+            return f"{settings.MEDIA_URL}{obj.user.profile_picture}"
+        return None
 
 
 

@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+from django.http import HttpResponseBadRequest, JsonResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status,views
@@ -6,8 +6,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework import permissions
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from .models import Booking, Review, User,Worker,Slot
-from .serializers import (BookingSerializer, ReviewSerializer, SlotSerializer, UserSerializer,UserProfileSerializer, WorkerBookingSerializer, WorkerSerializer,WorkerSignupSerializer,
+from .models import Booking, Review, RoomMember, User,Worker,Slot
+from .serializers import (BookingSerializer, ReviewSerializer, SlotSerializer, UserSerializer,UserProfileSerializer, VisitWorkerProfileSerializer, WorkerBookingSerializer, WorkerSerializer,WorkerSignupSerializer,
                           WorkerProfileSerializer,ServiceSerializer,WorkerServiceSerializer, WorkerSlotSerializer)
 from .tokens import CustomRefreshToken
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -23,12 +23,16 @@ from django.core.cache import cache
 from django.core.mail import send_mail
 from admin_app.models import Service
 from django.shortcuts import get_object_or_404
-from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.generics import RetrieveAPIView
 from django.utils import timezone
 from django.conf import settings
 import paypalrestsdk
 from decimal import Decimal
-import random
+from agora_token_builder import RtcTokenBuilder
+import json, time, random
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+
 
 
 User = get_user_model()
@@ -630,6 +634,68 @@ class ServiceReviewsAPIView(APIView):
             return Response({"error": "Service not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
+class VisitWorkerProfileView(RetrieveAPIView):
+    queryset = Worker.objects.all()
+    serializer_class = VisitWorkerProfileSerializer
+    permission_classes = [AllowAny]
+    
+    
+    
+
+
+class GetTokenView(View):
+    def get(self, request):
+        app_id = "f10d6d9bb8be4f39a817074843a6a43e"
+        app_certificate = "2ede2e535be8473aa063d92a14e9e499"
+        channel_name = request.GET.get('channel')
+
+        if not channel_name:
+            return JsonResponse({"error": "Channel name is required"}, status=400)
+
+        uid = random.randint(1, 230)
+        expiration_time = 3600
+        current_timestamp = int(time.time())
+        privilege_expired_ts = current_timestamp + expiration_time
+        role = 1
+
+        token = RtcTokenBuilder.buildTokenWithUid(app_id, app_certificate, channel_name, uid, role, privilege_expired_ts)
+
+        return JsonResponse({'token': token, 'uid': uid})
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class CreateMemberView(View):
+    def post(self, request):
+        data = json.loads(request.body)
+        member, created = RoomMember.objects.get_or_create(
+            name=data['name'],
+            uid=data['UID'],
+            room_name=data['room_name']
+        )
+        return JsonResponse({'name': data['name']})
+
+class GetMemberView(View):
+    def get(self, request):
+        uid = request.GET.get('UID')
+        room_name = request.GET.get('room_name')
+
+        try:
+            member = RoomMember.objects.get(uid=uid, room_name=room_name)
+            return JsonResponse({'name': member.name})
+        except RoomMember.DoesNotExist:
+            return JsonResponse({'error': 'Member not found'}, status=404)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class DeleteMemberView(View):
+    def post(self, request):
+        data = json.loads(request.body)
+        try:
+            member = RoomMember.objects.get(name=data['name'], uid=data['UID'], room_name=data['room_name'])
+            member.delete()
+            return JsonResponse({'message': 'Member deleted'})
+        except RoomMember.DoesNotExist:
+            return JsonResponse({'error': 'Member not found'}, status=404)
+    
 
 
 ##################################################################################### workers related views
