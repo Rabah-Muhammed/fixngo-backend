@@ -6,7 +6,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework import permissions
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from .models import Booking, Review, RoomMember, User,Worker,Slot
+from .models import Booking, Review, RoomMember, User,Worker,Slot, WorkerWallet
 from .serializers import (BookingSerializer, ReviewSerializer, SlotSerializer, UserSerializer,UserProfileSerializer, VisitWorkerProfileSerializer, WorkerBookingSerializer, WorkerSerializer,WorkerSignupSerializer,
                           WorkerProfileSerializer,ServiceSerializer,WorkerServiceSerializer, WorkerSlotSerializer)
 from .tokens import CustomRefreshToken
@@ -30,6 +30,7 @@ import paypalrestsdk
 from decimal import Decimal
 from agora_token_builder import RtcTokenBuilder
 import json, time, random
+from datetime import timedelta
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 
@@ -549,7 +550,7 @@ class UserBookingsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        bookings = Booking.objects.filter(user=request.user).order_by("-id")
+        bookings = Booking.objects.filter(user=request.user).order_by("-created_at") 
         serializer = BookingSerializer(bookings, many=True)
         return Response(serializer.data)
 
@@ -571,6 +572,19 @@ class PayRemainingBalanceView(APIView):
         except Booking.DoesNotExist:
             return Response({"detail": "Booking not found."}, status=status.HTTP_404_NOT_FOUND)
         
+        
+class WorkerWalletView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """Retrieve worker's wallet balance"""
+        if not hasattr(request.user, "worker_profile"):
+            return Response({"error": "You are not a worker"}, status=403)
+
+        worker = request.user.worker_profile
+        wallet, _ = WorkerWallet.objects.get_or_create(worker=worker)
+        return Response({"balance": wallet.balance})
+
         
 
 class ReviewView(APIView):
@@ -640,13 +654,12 @@ class VisitWorkerProfileView(RetrieveAPIView):
     permission_classes = [AllowAny]
     
     
-    
 
 
 class GetTokenView(View):
     def get(self, request):
-        app_id = "f10d6d9bb8be4f39a817074843a6a43e"
-        app_certificate = "2ede2e535be8473aa063d92a14e9e499"
+        app_id = settings.AGORA_APP_ID
+        app_certificate = settings.AGORA_APP_CERTIFICATE
         channel_name = request.GET.get('channel')
 
         if not channel_name:
@@ -662,39 +675,42 @@ class GetTokenView(View):
 
         return JsonResponse({'token': token, 'uid': uid})
 
-
-@method_decorator(csrf_exempt, name='dispatch')
+@method_decorator(csrf_exempt, name="dispatch")
 class CreateMemberView(View):
     def post(self, request):
         data = json.loads(request.body)
+        username = data.get("name", "Guest")
+
         member, created = RoomMember.objects.get_or_create(
-            name=data['name'],
-            uid=data['UID'],
-            room_name=data['room_name']
+            name=username,
+            uid=int(data["UID"]),  # Convert UID to int
+            room_name=data["room_name"],
         )
-        return JsonResponse({'name': data['name']})
+
+        return JsonResponse({"name": username, "created": created})
 
 class GetMemberView(View):
     def get(self, request):
-        uid = request.GET.get('UID')
-        room_name = request.GET.get('room_name')
+        uid = request.GET.get("UID")
+        room_name = request.GET.get("room_name")
 
         try:
             member = RoomMember.objects.get(uid=uid, room_name=room_name)
-            return JsonResponse({'name': member.name})
+            return JsonResponse({"name": member.name})
         except RoomMember.DoesNotExist:
-            return JsonResponse({'error': 'Member not found'}, status=404)
+            return JsonResponse({"error": "Member not found"}, status=404)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class DeleteMemberView(View):
-    def post(self, request):
+    def delete(self, request):
         data = json.loads(request.body)
         try:
-            member = RoomMember.objects.get(name=data['name'], uid=data['UID'], room_name=data['room_name'])
+            member = RoomMember.objects.get(name=data['name'], uid=int(data['UID']), room_name=data['room_name'])
             member.delete()
             return JsonResponse({'message': 'Member deleted'})
         except RoomMember.DoesNotExist:
             return JsonResponse({'error': 'Member not found'}, status=404)
+
     
 
 
@@ -918,7 +934,7 @@ class WorkerBookingListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Booking.objects.filter(worker=self.request.user.worker_profile, status="pending")
+        return Booking.objects.filter(worker=self.request.user.worker_profile, status__in=["pending", "processing", "started"])
 
 
 class WorkerBookingUpdateView(generics.UpdateAPIView):
@@ -927,26 +943,45 @@ class WorkerBookingUpdateView(generics.UpdateAPIView):
 
     def patch(self, request, pk):
         try:
-            booking = Booking.objects.get(pk=pk, worker=request.user.worker_profile)
+            booking = get_object_or_404(Booking, pk=pk, worker=request.user.worker_profile)
             status_choice = request.data.get("status")
 
-            if status_choice in ["processing", "cancelled"]:  
+            if status_choice in ["processing", "cancelled", "started"]:
                 booking.status = status_choice
                 booking.save()
                 return Response({"message": "Booking updated successfully", "status": booking.status})
+
             return Response({"error": "Invalid status choice"}, status=status.HTTP_400_BAD_REQUEST)
 
         except Booking.DoesNotExist:
             return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
-        
-        
-        
+
+
+class WorkerStartBookingView(generics.UpdateAPIView):
+    serializer_class = WorkerBookingSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        try:
+            booking = get_object_or_404(Booking, pk=pk, worker=request.user.worker_profile)
+
+            if booking.status == "processing":
+                booking.status = "started"
+                booking.save()
+                return Response({"message": "Work started successfully", "status": booking.status})
+
+            return Response({"error": "Invalid status change"}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Booking.DoesNotExist:
+            return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
 class WorkerManageBookingsView(generics.ListAPIView):
     serializer_class = WorkerBookingSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Booking.objects.filter(worker=self.request.user.worker_profile, status="processing")
+        return Booking.objects.filter(worker=self.request.user.worker_profile, status="started")
 
 
 class WorkerCompleteBookingView(generics.UpdateAPIView):
@@ -955,43 +990,61 @@ class WorkerCompleteBookingView(generics.UpdateAPIView):
 
     def patch(self, request, pk):
         try:
-            booking = get_object_or_404(Booking, pk=pk, worker=request.user.worker_profile, status="processing")
+            booking = get_object_or_404(Booking, pk=pk, worker=request.user.worker_profile, status="started")
 
-            # Get hours worked from request
+            # Validate hours worked
             hours_worked = request.data.get("hours_worked")
-            if hours_worked is None or float(hours_worked) <= 0:
-                return Response({"error": "Invalid hours worked"}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                hours_worked = float(hours_worked)
+                if hours_worked <= 0:
+                    return Response({"error": "Hours worked must be greater than 0."}, status=status.HTTP_400_BAD_REQUEST)
+                if hours_worked > 8:
+                    return Response({"error": "You cannot work more than 8 hours."}, status=status.HTTP_400_BAD_REQUEST)
+            except (ValueError, TypeError):
+                return Response({"error": "Invalid hours worked format."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Validate hours worked against slot duration
-            slot_duration = (booking.slot.end_time - booking.slot.start_time).total_seconds() / 3600  # Convert to hours
-            if float(hours_worked) > slot_duration:
-                return Response({"error": f"Hours worked cannot exceed slot duration ({slot_duration:.2f} hours)"}, status=status.HTTP_400_BAD_REQUEST)
+            # Calculate new end time
+            new_end_time = booking.slot.start_time + timedelta(hours=hours_worked)
 
-            # Calculate total charge based on hours worked
-            hourly_rate = float(booking.service.hourly_rate)  # Using 'hourly_rate' as the hourly rate
-            total_price = float(hours_worked) * hourly_rate
+            # Update slot end time permanently in the database
+            booking.slot.end_time = new_end_time
+            booking.slot.is_available = False
+            booking.slot.save()
 
-            # Update booking details with the new total price
+            # Calculate total charge
+            hourly_rate = float(booking.service.hourly_rate)
+            total_price = round(hours_worked * hourly_rate, 2)
+
+            # Update booking details
             booking.remaining_balance = total_price
             booking.status = "workdone"
+            booking.hours_worked = hours_worked
             booking.save()
 
-            # Mark the slot as unavailable since work is done
-            if booking.slot:
-                booking.slot.is_available = False
-                booking.slot.save()
-
             return Response({
-                "message": "Booking marked as completed",
+                "message": "Booking marked as completed.",
                 "status": booking.status,
-                "remaining_balance": total_price
-            })
+                "remaining_balance": total_price,
+                "updated_slot_end_time": booking.slot.end_time.strftime("%Y-%m-%d %H:%M:%S")
+            }, status=status.HTTP_200_OK)
 
         except Booking.DoesNotExist:
-            return Response({"error": "Booking not found or not in processing status"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Booking not found or not in started status"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+
+class CompletedBookingsList(generics.ListAPIView):
+    serializer_class = BookingSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Return completed bookings for the authenticated worker"""
+        user = self.request.user
+        worker = get_object_or_404(Worker, user=user)  # Ensure worker exists
+
+        return Booking.objects.filter(worker=worker, status="completed")
 
 
 class WorkerReviewListView(generics.ListAPIView):

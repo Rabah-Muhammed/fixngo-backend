@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from admin_app.models import Service
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 class User(AbstractUser):
     USER_ROLES = (
@@ -65,6 +67,7 @@ class Booking(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('processing', 'Processing'),
+        ('started', 'Started'),
         ('workdone', 'Work Done'),
         ('cancelled', 'Cancelled'),
         ('completed', 'Completed'),
@@ -93,8 +96,41 @@ class Booking(models.Model):
 
     def __str__(self):
             return f"Booking #{self.id} - {self.user.username} with {self.worker.user.username}"
-
         
+        
+@receiver(post_save, sender=Booking)
+def update_worker_wallet(sender, instance, **kwargs):
+    """
+    When a booking's payment status is marked as 'completed',
+    credit the worker's wallet with the remaining balance.
+    """
+    if instance.payment_status == "completed":
+        worker_wallet, created = WorkerWallet.objects.get_or_create(worker=instance.worker)
+        worker_wallet.credit_wallet(instance.remaining_balance)
+
+
+
+class WorkerWallet(models.Model):
+    worker = models.OneToOneField(Worker, on_delete=models.CASCADE, related_name="wallet")
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.worker.user.username}'s Wallet - Balance: ${self.balance}"
+
+    def credit_wallet(self, amount):
+        """Credits the worker's wallet with the given amount."""
+        self.balance += amount
+        self.save()
+
+
+@receiver(post_save, sender=Worker)
+def create_worker_wallet(sender, instance, created, **kwargs):
+    """Ensure every worker has a wallet upon creation."""
+    if created:
+        WorkerWallet.objects.create(worker=instance)
+
+
 
 class Review(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -111,7 +147,7 @@ class Review(models.Model):
 
 class RoomMember(models.Model):
     name = models.CharField(max_length=200)
-    uid = models.CharField(max_length=1000)
+    uid = models.IntegerField(unique=True) 
     room_name = models.CharField(max_length=200)
     insession = models.BooleanField(default=True)
 

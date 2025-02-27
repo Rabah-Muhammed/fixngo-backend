@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    CreateMemberView, CreatePayPalOrder, DeleteMemberView, ExecutePayPalPayment, GetMemberView, GetTokenView,
+    CompletedBookingsList, CreateMemberView, CreatePayPalOrder, DeleteMemberView, ExecutePayPalPayment, GetMemberView, GetTokenView,
     PlatformFeeView, ReviewView,ServiceDetailView, ServiceReviewsAPIView, SignupView,
     SlotDetailView, SlotEditView, UserBookingsView, VerifyOTPView, ResendOtpAPIView,
     LoginView, ResetPasswordView, RequestPasswordResetView,
@@ -16,7 +16,7 @@ from .views import (
     WorkerProfileView, WorkerServicesView, WorkerServiceUpdateView,
     SlotListCreateView,SlotDeleteView, WorkerBookingListView, WorkerBookingUpdateView,
     WorkerCompleteBookingView, WorkerManageBookingsView, 
-    WorkerDetailView,WorkerSlotPageView,WorkerReviewListView,
+    WorkerDetailView,WorkerSlotPageView,WorkerReviewListView, WorkerStartBookingView, WorkerWalletView,
     
 )
 
@@ -48,14 +48,15 @@ urlpatterns = [
     path('api/paypal/execute/', ExecutePayPalPayment.as_view(), name='execute_paypal_payment'),
     path('user/bookings/', UserBookingsView.as_view(), name='user-bookings'),
     path('bookings/<int:booking_id>/pay-remaining/', PayRemainingBalanceView.as_view(), name='pay_remaining_balance'),
+    path("worker-wallet/", WorkerWalletView.as_view(), name="worker-wallet"),
     path("reviews/", ReviewView.as_view(), name="create_review"),
     path("reviews/booking/<int:booking_id>/", ReviewView.as_view(), name="get_review_for_booking"),
     path("reviews/<int:review_id>/", ReviewView.as_view(), name="update_review"),
     path("services/<int:service_id>/reviews/", ServiceReviewsAPIView.as_view(), name="service-reviews"),
-    path('get_token/', GetTokenView.as_view()),
-    path('create_member/', CreateMemberView.as_view()),
-    path('get_member/', GetMemberView.as_view()),
-    path('delete_member/', DeleteMemberView.as_view()),
+    path('get_token/', GetTokenView.as_view(), name="get_token"),
+    path('create_member/', CreateMemberView.as_view(), name="create_member"),
+    path('get_member/', GetMemberView.as_view(), name="get_member"),
+    path('delete_member/', DeleteMemberView.as_view(), name="delete_member"),
 
 
     # Worker endpoints
@@ -71,7 +72,9 @@ urlpatterns = [
     path("worker/bookings/", WorkerBookingListView.as_view(), name="worker-bookings"),
     path("worker/bookings/<int:pk>/", WorkerBookingUpdateView.as_view(), name="worker-booking-update"),
     path("worker/manage-bookings/", WorkerManageBookingsView.as_view(), name="worker-manage-bookings"),
+    path("worker/bookings/start/<int:pk>/", WorkerStartBookingView.as_view(), name="worker-start-booking"),
     path("worker/bookings/<int:pk>/complete/", WorkerCompleteBookingView.as_view(), name="worker-complete-booking"),
+    path("worker/completed-bookings/", CompletedBookingsList.as_view(), name="worker-completed-bookings"),
     path("worker/reviews/", WorkerReviewListView.as_view(), name="worker-reviews"),
     
 ]

@@ -1,6 +1,6 @@
 from django.conf import settings
 from rest_framework import serializers
-from .models import Booking, Review,User,Worker,Slot
+from .models import Booking, Review,User,Worker,Slot, WorkerWallet
 from admin_app.models import Service
 from django.utils.timezone import now
 
@@ -89,18 +89,31 @@ class BookingSerializer(serializers.ModelSerializer):
     service_id = serializers.IntegerField(source="service.id", read_only=True)
     worker_name = serializers.CharField(source="worker.user.username", read_only=True)
     worker_id = serializers.IntegerField(source="worker.id", read_only=True)
+    user_name = serializers.CharField(source="user.username", read_only=True)  # ✅ Added user_name
     start_time = serializers.DateTimeField(source="slot.start_time", format="%Y-%m-%d %H:%M:%S", read_only=True)
     end_time = serializers.DateTimeField(source="slot.end_time", format="%Y-%m-%d %H:%M:%S", read_only=True)
     remaining_balance = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     platform_fee = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     created_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", read_only=True)
+    completed_at = serializers.DateTimeField(source="updated_at", format="%Y-%m-%d %H:%M:%S", read_only=True)  # ✅ Added completed_at
 
     class Meta:
         model = Booking
-        fields = ['id', 'service_name', 'worker_name', 'start_time', 'end_time', 'status',
-                  'service_id', 'worker_id', 'remaining_balance', 'payment_status', 'total_price', 
-                  'platform_fee', 'created_at']
+        fields = [
+            'id', 'service_name', 'worker_name', 'user_name', 'start_time', 'end_time', 'status',
+            'service_id', 'worker_id', 'remaining_balance', 'payment_status', 'total_price',
+            'platform_fee', 'created_at', 'completed_at'
+        ]
+
+        
+
+
+class WorkerWalletSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkerWallet
+        fields = ["balance", "updated_at"]
+        
         
 
 class ReviewSerializer(serializers.ModelSerializer):
