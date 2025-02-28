@@ -76,6 +76,7 @@ urlpatterns = [
     path("worker/bookings/<int:pk>/complete/", WorkerCompleteBookingView.as_view(), name="worker-complete-booking"),
     path("worker/completed-bookings/", CompletedBookingsList.as_view(), name="worker-completed-bookings"),
     path("worker/reviews/", WorkerReviewListView.as_view(), name="worker-reviews"),
+    path('worker/dashboard/', WorkerDashboardView.as_view(), name='worker-dashboard'),
     
 ]
    

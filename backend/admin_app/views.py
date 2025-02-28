@@ -1,4 +1,5 @@
 # backend/admin_app/views.py
+from decimal import Decimal
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -10,9 +11,10 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from api.models import Booking, Review, User, Worker
 from .serializers import BookingSerializer, ReviewSerializer, ServiceSerializer
 from .models import Service
-from django.core.paginator import Paginator
+from django.db.models.functions import TruncMonth
 from rest_framework import generics
 from rest_framework.parsers import MultiPartParser, FormParser
+from django.db.models import Count,Sum
 
 
 class AdminLoginView(APIView):
@@ -43,31 +45,73 @@ class AdminLoginView(APIView):
                 return Response({"error": "You are not authorized as an admin."}, status=status.HTTP_403_FORBIDDEN)
 
         return Response({"error": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
-
+    
+    
+    
 class AdminDashboardView(APIView):
-    permission_classes = [IsAuthenticated]  # Ensure only authenticated admins can access
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Fetch data for the dashboard
-        total_users = User.objects.filter(role='USER').count()
-        total_workers = User.objects.filter(role='WORKER').count()
-        active_users = User.objects.filter(role='USER', is_active=True).count()
-        active_workers = User.objects.filter(role='WORKER', is_active=True).count()
+        total_users = User.objects.count()
+        active_users = User.objects.filter(is_active=True).count()
+        total_workers = Worker.objects.count()
+        active_workers = Worker.objects.filter(user__is_active=True).count()
+        total_services = Service.objects.count()
+        total_bookings = Booking.objects.count()
+        pending_bookings = Booking.objects.filter(status="pending").count()
+        completed_bookings = Booking.objects.filter(status="completed").count()
+        cancelled_bookings = Booking.objects.filter(status="cancelled").count()
+        
+        # ✅ Calculate total platform fee earnings
+        platform_earnings = Booking.objects.aggregate(total=Sum('platform_fee'))['total'] or Decimal("0")
 
-        # Additional worker stats
-        top_rated_workers = Worker.objects.filter(rating__gte=4.5).count()
-        workers_with_jobs = Worker.objects.filter(completed_jobs__gt=0).count()
+        # Total earnings from completed bookings
+        total_earnings = Booking.objects.filter(status="completed").aggregate(total=Sum('remaining_balance'))['total'] or Decimal("0")
 
-        # Prepare the data
-        data = {
-            'total_users': total_users,
-            'active_users': active_users,
-            'total_workers': total_workers,
-            'active_workers': active_workers,
-            'top_rated_workers': top_rated_workers,
-            'workers_with_jobs': workers_with_jobs,
-        }
-        return Response(data)
+        total_earnings = total_earnings + platform_earnings
+
+
+
+        # Monthly booking trend
+        monthly_bookings = (
+            Booking.objects
+            .annotate(month=TruncMonth('created_at'))
+            .values('month')
+            .annotate(count=Count('id'))
+            .order_by('month')
+        )
+        booking_trend_data = {entry["month"].strftime('%Y-%m'): entry["count"] for entry in monthly_bookings}
+
+        recent_bookings = Booking.objects.select_related('user', 'worker', 'service').order_by('-created_at')[:5]
+        recent_bookings_data = [
+            {
+                "id": booking.id,
+                "user": booking.user.username if booking.user else "N/A",
+                "worker": booking.worker.user.username if booking.worker else "N/A",
+                "service": booking.service.name if booking.service else "N/A",
+                "status": booking.status,
+                "amount": booking.remaining_balance,
+                "created_at": booking.created_at,
+            }
+            for booking in recent_bookings
+        ]
+
+        return Response({
+            "total_users": total_users,
+            "active_users": active_users,
+            "total_workers": total_workers,
+            "active_workers": active_workers,
+            "total_services": total_services,
+            "total_bookings": total_bookings,
+            "pending_bookings": pending_bookings,
+            "completed_bookings": completed_bookings,
+            "cancelled_bookings": cancelled_bookings,
+            "total_earnings": total_earnings,
+            "platform_earnings": platform_earnings, 
+            "booking_trend_data": booking_trend_data,
+            "recent_bookings": recent_bookings_data,
+        })
+
     
 class UsersListView(APIView):
     permission_classes = [IsAuthenticated]  # Ensure only authenticated admins can access

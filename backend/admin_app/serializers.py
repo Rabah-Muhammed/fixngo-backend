@@ -1,7 +1,5 @@
-# backend/api/views.py
 from rest_framework import serializers
-from .models import Service
-from api.models import Booking,User,Review,Worker
+from api.models import Booking, User, Review, Worker, Service
 
 
 class ServiceSerializer(serializers.ModelSerializer):
@@ -9,14 +7,25 @@ class ServiceSerializer(serializers.ModelSerializer):
         model = Service
         fields = ['id', 'name', 'description', 'hourly_rate', 'image', 'created_at', 'updated_at']
 
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email']  # Add other user fields as needed
+        fields = ['id', 'username', 'email']
+
+
+class WorkerSerializer(serializers.ModelSerializer):
+    user = UserSerializer()  # Include worker's user details
+
+    class Meta:
+        model = Worker
+        fields = ['id', 'user']  # Removed `experience` if it doesn't exist in the model
+
 
 class BookingSerializer(serializers.ModelSerializer):
-    user = UserSerializer()  # Nest user details
-    service = ServiceSerializer()  # Nest service details
+    user = UserSerializer()
+    service = ServiceSerializer()
+    worker = WorkerSerializer(read_only=True)  # Handle worker details correctly
 
     class Meta:
         model = Booking
@@ -25,8 +34,9 @@ class BookingSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         if 'created_at' in representation:
-            representation['created_at'] = instance.created_at.strftime('%Y-%m-%d %H:%M:%S')  # Format date
+            representation['created_at'] = instance.created_at.strftime('%Y-%m-%d %H:%M:%S')
         return representation
+
 
 
 class ReviewSerializer(serializers.ModelSerializer):

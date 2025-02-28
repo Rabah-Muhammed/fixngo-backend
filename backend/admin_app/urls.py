@@ -8,7 +8,7 @@ from .views import (AdminBookingListView, AdminLoginView,AdminDashboardView, Can
 
 urlpatterns = [
     path('login/', AdminLoginView.as_view(), name='admin-login'),  # Admin login endpoint
-    path('dashboard/', AdminDashboardView.as_view(), name='admin_dashboard'),  # Protect this endpoint
+    path("dashboard/", AdminDashboardView.as_view(), name="admin-dashboard"),  # Protect this endpoint
     path('users/', UsersListView.as_view(), name='users_list'),  # Add this path
     path('block/<int:user_id>/', BlockUserView.as_view(), name='block-user'),
     path('unblock/<int:user_id>/', UnblockUserView.as_view(), name='unblock-user'),

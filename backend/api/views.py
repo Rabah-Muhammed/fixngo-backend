@@ -33,6 +33,10 @@ import json, time, random
 from datetime import timedelta
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django.db.models import Count, Avg, Sum
+from api.models import Booking
+from api.models import WorkerWallet
+from api.models import Review
 
 
 
@@ -1055,3 +1059,45 @@ class WorkerReviewListView(generics.ListAPIView):
         # Fetch reviews for the authenticated worker
         worker = self.request.user.worker_profile
         return Review.objects.filter(worker=worker)
+    
+    
+
+class WorkerDashboardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            worker = Worker.objects.get(user=request.user)
+
+            # Fetch total completed jobs and earnings
+            total_completed_jobs = Booking.objects.filter(worker=worker, status="completed").count()
+            total_earnings = Booking.objects.filter(worker=worker, payment_status="completed").aggregate(total=Sum("remaining_balance"))["total"] or 0.00
+
+            # Fetch wallet balance
+            worker_wallet = WorkerWallet.objects.filter(worker=worker).first()
+            wallet_balance = worker_wallet.balance if worker_wallet else 0.00
+
+            # Fetch recent completed bookings
+            recent_completed_bookings = Booking.objects.filter(worker=worker, status="completed").order_by('-created_at')[:5]
+            recent_completed_bookings_data = BookingSerializer(recent_completed_bookings, many=True).data
+
+            # Fetch recent reviews
+            recent_reviews = Review.objects.filter(worker=worker).order_by('-created_at')[:5].values('review', 'rating')
+
+            # Calculate average rating
+            avg_rating = Review.objects.filter(worker=worker).aggregate(avg_rating=Avg("rating"))["avg_rating"] or 0.00
+
+            return Response({
+                "username": worker.user.username,
+                "email": worker.user.email,
+                "phone_number": worker.user.phone_number,
+                "total_completed_jobs": total_completed_jobs,
+                "total_earnings": total_earnings,
+                "wallet_balance": wallet_balance,
+                "recent_bookings": recent_completed_bookings_data, 
+                "recent_reviews": list(recent_reviews),
+                "avg_rating": round(avg_rating, 2),
+            })
+
+        except Worker.DoesNotExist:
+            return Response({"error": "Worker profile not found"}, status=404)
