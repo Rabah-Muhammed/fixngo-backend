@@ -7,6 +7,7 @@ from oauth2client import client
 import urllib
 import requests
 import jwt
+from django.conf import settings
 
 def generate_otp():
     return str(random.randint(100000, 999999))
@@ -37,8 +38,8 @@ def get_id_token_with_code_method_2(code):
     token_endpoint = "https://oauth2.googleapis.com/token"
     payload = {
         'code': code,
-        'client_id': '500698877294-jam712pdk43id3s0v5mg9k1ol2jjdl6a.apps.googleusercontent.com',
-        'client_secret': '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',
+        'client_id': settings.GOOGLE_CLIENT_ID,
+        'client_secret': settings.GOOGLE_CLIENT_SECRET,
         'grant_type': 'authorization_code',
         'redirect_uri': "postmessage"
     }

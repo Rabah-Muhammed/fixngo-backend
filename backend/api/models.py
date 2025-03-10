@@ -95,7 +95,9 @@ class Booking(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-            return f"Booking #{self.id} - {self.user.username} with {self.worker.user.username}"
+        user_name = self.user.username if self.user else "Unknown User"
+        worker_name = self.worker.user.username if self.worker and self.worker.user else "Unknown Worker"
+        return f"Booking #{self.id} - {user_name} with {worker_name}"
         
         
 @receiver(post_save, sender=Booking)

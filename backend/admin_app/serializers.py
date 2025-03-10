@@ -37,6 +37,14 @@ class BookingSerializer(serializers.ModelSerializer):
             representation['created_at'] = instance.created_at.strftime('%Y-%m-%d %H:%M:%S')
         return representation
 
+class BookingDetailSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source="user.username", read_only=True) 
+    worker_name = serializers.CharField(source="worker.user.username", read_only=True)
+    service_name = serializers.CharField(source="service.name", read_only=True)
+
+    class Meta:
+        model = Booking
+        fields = ["id", "user_name", "worker_name", "service_name", "status", "total_price", "created_at"]
 
 
 class ReviewSerializer(serializers.ModelSerializer):

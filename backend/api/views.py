@@ -231,30 +231,35 @@ class LoginWithGoogle(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        if 'code' in request.data.keys():
-            code = request.data['code']
-            id_token = get_id_token_with_code_method_2(code)
-            if not id_token:
-                return Response({'error': 'Invalid Google token'}, status=400)
+        if 'code' not in request.data:
+            return Response({'error': 'Code not provided'}, status=400)
 
-            user_email = id_token['email']
-            user_username = id_token.get('name', user_email)  # Use Google account name as username
-            user = authenticate_or_create_user(user_email, user_username)
+        code = request.data['code']
+        id_token = get_id_token_with_code_method_2(code)  # Get Google ID token
 
-            # Create custom access and refresh tokens for the user with additional claims
-            access_token = CustomRefreshToken.for_user(user)
-            refresh_token = CustomRefreshToken.for_user(user)
+        if not id_token:
+            return Response({'error': 'Invalid Google token'}, status=400)
 
-            # Return both access token and refresh token
-            return Response({
-                'access_token': str(access_token),  # Return access token
-                'refresh_token': str(refresh_token),  # Return refresh token
-                'username': user_username,  # Return username
-                'role': user.role,  # Return role
-                'email': user_email  # Return email
-            })
+        user_email = id_token.get('email')
+        if not user_email:
+            return Response({'error': 'Email not found in Google response'}, status=400)
 
-        return Response('Code not provided', status=400)
+        user_username = id_token.get('name', user_email)  # Use Google account name as username
+
+        # Authenticate or create a user
+        user = authenticate_or_create_user(user_email, user_username)
+
+        # Generate refresh and access tokens
+        refresh = RefreshToken.for_user(user)
+        access_token = refresh.access_token
+
+        return Response({
+            'access_token': str(access_token),  
+            'refresh_token': str(refresh), 
+            'username': user.username,
+            'role': user.role,
+            'email': user.email
+        })
     
     
 class UserProfileView(APIView):
@@ -466,18 +471,11 @@ class BookingCreateView(APIView):
 
         try:
             worker = get_object_or_404(Worker, id=worker_id)
-            slot = get_object_or_404(Slot, id=slot_id, is_booked=False)  # Ensure slot isn't already booked
+            slot = get_object_or_404(Slot, id=slot_id, is_booked=False) 
             service = get_object_or_404(Service, id=service_id)
-
-            platform_fee = Decimal(getattr(service, 'platform_fee', 10))  # Ensure platform_fee is Decimal
-
-            # Convert duration to Decimal to avoid TypeError
+            platform_fee = Decimal(getattr(service, 'platform_fee', 10))  
             duration = Decimal((slot.end_time - slot.start_time).total_seconds()) / Decimal(3600)
-
-            # Calculate total price correctly using Decimal
             total_price = service.hourly_rate * duration + platform_fee
-
-            # Remaining balance should be total price minus platform fee
             remaining_balance = total_price - platform_fee
 
             booking = Booking.objects.create(
@@ -533,16 +531,29 @@ class CancelBookingView(APIView):
             if booking.user != request.user:
                 return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
 
+            # Allow cancellation only if status is not already cancelled
+            if booking.status == "cancelled":
+                return Response({"error": "Booking is already cancelled"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # If the booking is pending or processing, update payment status to refunded
+            if booking.status in ["pending", "processing"]:
+                booking.payment_status = "refunded"
+
+            # Update booking status to cancelled
             booking.status = "cancelled"
-            # booking.payment_status = "completed" ################# error
             booking.save()
 
+            # Mark slot as available again
             slot = booking.slot
             slot.is_available = True
             slot.save()
 
             return Response(
-                {"message": "Booking canceled successfully", "status": booking.status},
+                {
+                    "message": "Booking canceled successfully",
+                    "status": booking.status,
+                    "payment_status": booking.payment_status,
+                },
                 status=status.HTTP_200_OK,
             )
 
@@ -550,14 +561,6 @@ class CancelBookingView(APIView):
             return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
         
         
-class UserBookingsView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        bookings = Booking.objects.filter(user=request.user).order_by("-created_at") 
-        serializer = BookingSerializer(bookings, many=True)
-        return Response(serializer.data)
-
 class PayRemainingBalanceView(APIView):
     def patch(self, request, booking_id):
         try:
@@ -571,11 +574,24 @@ class PayRemainingBalanceView(APIView):
             booking.status = 'completed'  # or whatever status is appropriate
             booking.payment_status = 'completed'  # Assuming this field exists
             booking.save()
+            
+            worker = booking.worker
+            worker.completed_jobs += 1
+            worker.save()
 
             return Response({"detail": "Remaining balance paid, booking is now completed."}, status=status.HTTP_200_OK)
         except Booking.DoesNotExist:
-            return Response({"detail": "Booking not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"detail": "Booking not found."}, status=status.HTTP_404_NOT_FOUND)        
         
+        
+class UserBookingsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        bookings = Booking.objects.filter(user=request.user).order_by("-created_at") 
+        serializer = BookingSerializer(bookings, many=True)
+        return Response(serializer.data)
+
         
 class WorkerWalletView(APIView):
     permission_classes = [IsAuthenticated]
@@ -714,7 +730,6 @@ class DeleteMemberView(View):
             return JsonResponse({'message': 'Member deleted'})
         except RoomMember.DoesNotExist:
             return JsonResponse({'error': 'Member not found'}, status=404)
-
     
 
 
@@ -763,21 +778,6 @@ class WorkerLoginView(APIView):
         return Response({"error": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
     
     
-class WorkerDashboardView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        # Ensure the logged-in user is a worker
-        if request.user.role != 'WORKER':
-            return Response({"error": "You do not have permission to view this page."}, status=status.HTTP_403_FORBIDDEN)
-
-        # Retrieve the worker profile (or related data)
-        worker = Worker.objects.get(user=request.user)
-        return Response({
-            "username": worker.user.username,
-            "email": worker.user.email,
-            "phone_number": worker.user.phone_number,
-        }, status=status.HTTP_200_OK)
         
 
 class WorkerProfileView(APIView):
@@ -1039,16 +1039,29 @@ class WorkerCompleteBookingView(generics.UpdateAPIView):
 
 
 
-class CompletedBookingsList(generics.ListAPIView):
-    serializer_class = BookingSerializer
+class CompletedBookingsList(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        """Return completed bookings for the authenticated worker"""
-        user = self.request.user
+    def get(self, request, format=None):
+        """Return completed bookings for the authenticated worker."""
+        user = request.user
         worker = get_object_or_404(Worker, user=user)  # Ensure worker exists
 
-        return Booking.objects.filter(worker=worker, status="completed")
+        completed_bookings = Booking.objects.filter(worker=worker, status="completed")
+        serializer = BookingSerializer(completed_bookings, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class WorkerBookingDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk, format=None):
+        
+        user = request.user
+        worker = get_object_or_404(Worker, user=user)  # Ensure worker exists for the authenticated user
+        booking = get_object_or_404(Booking, pk=pk, worker=worker)  # Ensure the booking belongs to this worker
+        serializer = BookingSerializer(booking)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class WorkerReviewListView(generics.ListAPIView):

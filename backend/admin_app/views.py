@@ -9,7 +9,7 @@ from .tokens import CustomRefreshToken
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from api.models import Booking, Review, User, Worker
-from .serializers import BookingSerializer, ReviewSerializer, ServiceSerializer
+from .serializers import BookingDetailSerializer, BookingSerializer, ReviewSerializer, ServiceSerializer
 from .models import Service
 from django.db.models.functions import TruncMonth
 from rest_framework import generics
@@ -284,6 +284,19 @@ class AdminBookingListView(APIView):
         bookings = Booking.objects.all()
         serializer = BookingSerializer(bookings, many=True)
         return Response(serializer.data)
+    
+class AdminBookingDetail(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, booking_id):
+        try:
+            # Fetch the booking with related user, worker, and service
+            booking = Booking.objects.select_related("user", "worker", "service").get(id=booking_id)
+            # Serialize the booking data
+            serializer = BookingDetailSerializer(booking)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Booking.DoesNotExist:
+            return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
     
     
 class CancelBookingView(APIView):

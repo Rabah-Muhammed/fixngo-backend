@@ -1,13 +1,14 @@
 from django.urls import path
 from .views import (
-    CompletedBookingsList, CreateMemberView, CreatePayPalOrder, DeleteMemberView, ExecutePayPalPayment, GetMemberView, GetTokenView,
+    CompletedBookingsList, CreateMemberView, CreatePayPalOrder, DeleteMemberView,
+    ExecutePayPalPayment, GetMemberView, GetTokenView,
     PlatformFeeView, ReviewView,ServiceDetailView, ServiceReviewsAPIView, SignupView,
     SlotDetailView, SlotEditView, UserBookingsView, VerifyOTPView, ResendOtpAPIView,
     LoginView, ResetPasswordView, RequestPasswordResetView,
     LoginWithGoogle, UserProfileView,UserServiceListView,
     UserServiceDetailView,ServiceWorkersView,
     BookingCreateView,BookingDetailView,CancelBookingView,BookingListView, 
-    PayRemainingBalanceView, VisitWorkerProfileView, WorkerReviewsView,
+    PayRemainingBalanceView, VisitWorkerProfileView,  WorkerReviewsView,
 
     
     
@@ -16,7 +17,8 @@ from .views import (
     WorkerProfileView, WorkerServicesView, WorkerServiceUpdateView,
     SlotListCreateView,SlotDeleteView, WorkerBookingListView, WorkerBookingUpdateView,
     WorkerCompleteBookingView, WorkerManageBookingsView, 
-    WorkerDetailView,WorkerSlotPageView,WorkerReviewListView, WorkerStartBookingView, WorkerWalletView,
+    WorkerDetailView,WorkerSlotPageView,WorkerReviewListView, WorkerStartBookingView,
+    WorkerWalletView,WorkerBookingDetailView,
     
 )
 
@@ -75,6 +77,7 @@ urlpatterns = [
     path("worker/bookings/start/<int:pk>/", WorkerStartBookingView.as_view(), name="worker-start-booking"),
     path("worker/bookings/<int:pk>/complete/", WorkerCompleteBookingView.as_view(), name="worker-complete-booking"),
     path("worker/completed-bookings/", CompletedBookingsList.as_view(), name="worker-completed-bookings"),
+    path("worker/bookingdetail/<int:pk>/", WorkerBookingDetailView.as_view(), name="worker-booking-detail"),
     path("worker/reviews/", WorkerReviewListView.as_view(), name="worker-reviews"),
     path('worker/dashboard/', WorkerDashboardView.as_view(), name='worker-dashboard'),
     
