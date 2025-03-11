@@ -37,14 +37,30 @@ class BookingSerializer(serializers.ModelSerializer):
             representation['created_at'] = instance.created_at.strftime('%Y-%m-%d %H:%M:%S')
         return representation
 
+
 class BookingDetailSerializer(serializers.ModelSerializer):
-    user_name = serializers.CharField(source="user.username", read_only=True) 
-    worker_name = serializers.CharField(source="worker.user.username", read_only=True)
     service_name = serializers.CharField(source="service.name", read_only=True)
+    service_id = serializers.IntegerField(source="service.id", read_only=True)
+    worker_name = serializers.CharField(source="worker.user.username", read_only=True)
+    worker_id = serializers.IntegerField(source="worker.id", read_only=True)
+    user_name = serializers.CharField(source="user.username", read_only=True)
+    start_time = serializers.DateTimeField(source="slot.start_time", format="%Y-%m-%d %H:%M:%S", read_only=True)
+    end_time = serializers.DateTimeField(source="slot.end_time", format="%Y-%m-%d %H:%M:%S", read_only=True)
+    remaining_balance = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    platform_fee = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    created_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", read_only=True)
+    completed_at = serializers.DateTimeField(source="updated_at", format="%Y-%m-%d %H:%M:%S", read_only=True)  # ✅ Added completed_at
+    transaction_id = serializers.CharField(required=True)
 
     class Meta:
         model = Booking
-        fields = ["id", "user_name", "worker_name", "service_name", "status", "total_price", "created_at"]
+        fields = [
+            'id', 'service_name', 'worker_name', 'user_name', 'start_time', 'end_time', 'status',
+            'service_id', 'worker_id', 'remaining_balance', 'payment_status', 'total_price',
+            'platform_fee', 'created_at', 'completed_at', 'transaction_id'
+        ]
+
 
 
 class ReviewSerializer(serializers.ModelSerializer):
