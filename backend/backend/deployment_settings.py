@@ -46,5 +46,3 @@ DATABASES = {
     )
 }
 
-
-#done
