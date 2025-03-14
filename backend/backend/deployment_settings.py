@@ -1,14 +1,14 @@
 import os
 import dj_database_url
 from .settings import *
-from .settings import BASE_DIR
 
+# Security settings
 ALLOWED_HOSTS = [os.environ.get('RENDER_EXTERNAL_HOSTNAME', 'localhost')]
 CSRF_TRUSTED_ORIGINS = ['https://' + os.environ.get('RENDER_EXTERNAL_HOSTNAME', 'localhost')]
-
 DEBUG = False
 SECRET_KEY = os.environ.get('SECRET_KEY', 'your-default-secret-key-for-local-testing')
 
+# Middleware (inherits from settings.py, adds CORS if not already in correct order)
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -21,22 +21,13 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
 ]
 
+# # CORS for production
+# CORS_ALLOW_ALL_ORIGINS = False  # Override insecure setting
 # CORS_ALLOWED_ORIGINS = [
 #     'https://your-react-app-domain.com',  # Replace with your frontend URL
 # ]
 
-STATIC_URL = '/static/'
-STATIC_ROOT = '/opt/render/project/src/backend/staticfiles/'  # Match Render’s path
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]  # Optional, for custom static files
-STORAGES = {
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
-    },
-}
-
+# Database for Render
 DATABASES = {
     'default': dj_database_url.config(
         default=os.environ.get('DATABASE_URL', 'sqlite:///db.sqlite3'),
@@ -44,11 +35,22 @@ DATABASES = {
     )
 }
 
+# Channels for Render Redis
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
             'hosts': [(os.environ.get('REDIS_URL', 'redis://localhost:6379'))],
         },
+    },
+}
+
+# Static files (add STORAGES since missing in settings.py)
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
     },
 }
