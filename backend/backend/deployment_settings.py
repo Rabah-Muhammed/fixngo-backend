@@ -3,12 +3,13 @@ import dj_database_url
 from .settings import *
 from .settings import BASE_DIR
 
+# Security settings
 ALLOWED_HOSTS = [os.environ.get('RENDER_EXTERNAL_HOSTNAME', 'localhost')]
 CSRF_TRUSTED_ORIGINS = ['https://' + os.environ.get('RENDER_EXTERNAL_HOSTNAME', 'localhost')]
-
 DEBUG = False
 SECRET_KEY = os.environ.get('SECRET_KEY', 'your-default-secret-key-for-local-testing')
 
+# Middleware
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -21,12 +22,15 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
 ]
 
+# # CORS for React frontend
 # CORS_ALLOWED_ORIGINS = [
-#     'http://localhost:5173',
-#     "http://localhost:3000",  
-#     "http://localhost:5174", 
+#     'https://your-react-app-domain.com',  # Replace with your frontend URL
 # ]
 
+# Static files
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]  # Optional, for custom static files
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
@@ -36,9 +40,20 @@ STORAGES = {
     },
 }
 
+# Database
 DATABASES = {
     'default': dj_database_url.config(
         default=os.environ.get('DATABASE_URL', 'sqlite:///db.sqlite3'),
         conn_max_age=600
     )
+}
+
+# Channels for WebSockets
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [(os.environ.get('REDIS_URL', 'redis://localhost:6379'))],
+        },
+    },
 }
