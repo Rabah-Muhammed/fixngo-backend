@@ -1,7 +1,12 @@
 set -o errexit
 
-pip install -r requirements.txt && python manage.py migrate && python manage.py collectstatic --noinput 
+pip install -r requirements.txt
 
-if [[ $CREATE_SUPERUSER == "True" ]]; then
-    python manage.py createsuperuser --no-input
-fi
+python manage.py collectstatic --no-input
+
+python manage.py migrate
+
+
+# if [[ $CREATE_SUPERUSER == "True" ]]; then
+#     python manage.py createsuperuser --no-input
+# fi
