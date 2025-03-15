@@ -44,6 +44,18 @@ CHANNEL_LAYERS = {
     },
 }
 
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379')
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': REDIS_URL,
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        }
+    }
+}
+
 # Static files (add STORAGES since missing in settings.py)
 STORAGES = {
     "default": {
