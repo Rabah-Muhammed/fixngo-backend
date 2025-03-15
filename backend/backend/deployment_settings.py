@@ -21,11 +21,10 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
 ]
 
-# # CORS for production
-# CORS_ALLOW_ALL_ORIGINS = False  # Override insecure setting
-# CORS_ALLOWED_ORIGINS = [
-#     'https://your-react-app-domain.com',  # Replace with your frontend URL
-# ]
+
+CORS_ALLOWED_ORIGINS = [
+    'https://fixngo-frontend.onrender.com'
+]
 
 # Database for Render
 DATABASES = {
