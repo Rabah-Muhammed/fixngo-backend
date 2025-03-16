@@ -42,9 +42,7 @@ AUTH_USER_MODEL = 'api.User'
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
 
-CORS_ALLOWED_ORIGINS = [
-    'https://fixngo-frontend.onrender.com'
-]
+
 
 # Application definition
 
@@ -209,7 +207,13 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',
     "http://localhost:3000",  
-    "http://localhost:5174", 
+    "http://localhost:5174",
+    "https://fixngo-frontend.onrender.com",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5174",
+    "https://fixngo-frontend.onrender.com",
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -253,8 +257,11 @@ DEFAULT_FROM_EMAIL = env('EMAIL_HOST_USER')
 GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET')
 
-SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
 
+LOGIN_REDIRECT_URL ='/'
+ACCOUNT_LOGOUT_REDIRECT_URL ='/'
+
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
 
 
 PAYPAL_CLIENT_ID = env('PAYPAL_CLIENT_ID')
