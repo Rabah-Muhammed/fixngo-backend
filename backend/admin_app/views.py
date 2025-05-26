@@ -61,11 +61,7 @@ class AdminDashboardView(APIView):
         pending_bookings = Booking.objects.filter(status="pending").count()
         completed_bookings = Booking.objects.filter(status="completed").count()
         cancelled_bookings = Booking.objects.filter(status="cancelled").count()
-        
-        # ✅ Calculate total platform fee earnings
         platform_earnings = Booking.objects.aggregate(total=Sum('platform_fee'))['total'] or Decimal("0")
-
-        # Total earnings from completed bookings
         total_earnings = Booking.objects.filter(status="completed").aggregate(total=Sum('remaining_balance'))['total'] or Decimal("0")
 
         total_earnings = total_earnings + platform_earnings
@@ -280,6 +276,7 @@ class ServiceUpdateDeleteView(APIView):
         
 
 class AdminBookingListView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         bookings = Booking.objects.all()
         serializer = BookingSerializer(bookings, many=True)
@@ -300,6 +297,7 @@ class AdminBookingDetail(APIView):
     
     
 class CancelBookingView(APIView):
+    permission_classes = [IsAuthenticated]
     def post(self, request, booking_id):
         try:
             # Get the booking by ID

@@ -1,4 +1,4 @@
-from django.http import HttpResponseBadRequest, JsonResponse
+from django.http import JsonResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status,views
@@ -43,7 +43,7 @@ from api.models import Review
 User = get_user_model()
 
 class SignupView(APIView):
-    permission_classes = [AllowAny]  # Ensure this endpoint is publicly accessible
+    permission_classes = [AllowAny]  
 
     def post(self, request):
         serializer = UserSerializer(data=request.data)
@@ -57,7 +57,7 @@ class SignupView(APIView):
 
 
 class VerifyOTPView(APIView):
-    permission_classes = [AllowAny]  # Ensure unauthenticated access
+    permission_classes = [AllowAny]  
 
     def post(self, request):
         email = request.data.get("email")
@@ -90,7 +90,7 @@ class VerifyOTPView(APIView):
 
 
 class ResendOtpAPIView(APIView):
-    permission_classes = [AllowAny]  # Ensure unauthenticated access
+    permission_classes = [AllowAny]  
 
     def post(self, request):
         email = request.data.get("email")
@@ -147,8 +147,8 @@ class ForgotPasswordView(APIView):
 
         try:
             user = User.objects.get(email=email)
-            otp = random.randint(100000, 999999)  # Generate OTP for password reset
-            cache.set(email, otp, timeout=600)  # Store OTP in cache for 10 minutes
+            otp = random.randint(100000, 999999)  
+            cache.set(email, otp, timeout=600)  
 
             send_mail(
                 subject="Password Reset OTP",
@@ -165,7 +165,7 @@ class ForgotPasswordView(APIView):
 User = get_user_model()
 
 def generate_otp():
-    return str(random.randint(100000, 999999))  # Generates a 6-digit OTP
+    return str(random.randint(100000, 999999)) 
 
 
 class RequestPasswordResetView(APIView):
@@ -209,7 +209,7 @@ class ResetPasswordView(APIView):
                     user = User.objects.get(email=email)
                     user.set_password(new_password)
                     user.save()
-                    cache.delete(email)  # Remove OTP from cache
+                    cache.delete(email)  
                     return Response({"message": "Password reset successful."}, status=status.HTTP_200_OK)
                 except User.DoesNotExist:
                     return Response({"error": "User with this email does not exist."}, status=status.HTTP_404_NOT_FOUND)
@@ -246,10 +246,10 @@ class LoginWithGoogle(APIView):
 
         user_username = id_token.get('name', user_email)  # Use Google account name as username
 
-        # Authenticate or create a user
+        
         user = authenticate_or_create_user(user_email, user_username)
 
-        # Generate refresh and access tokens
+        
         refresh = RefreshToken.for_user(user)
         access_token = refresh.access_token
 
@@ -286,17 +286,17 @@ class UserProfileView(APIView):
     
 
 class UserServiceListView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Get all the services available for the user
+        
         services = Service.objects.all().order_by('-created_at')
         serializer = ServiceSerializer(services, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     
 class UserServiceDetailView(APIView):
-    permission_classes = [IsAuthenticated]  # Only authenticated users can access
+    permission_classes = [IsAuthenticated]  
 
     def get(self, request, service_id):
         service = get_object_or_404(Service, id=service_id)
@@ -316,7 +316,7 @@ class ServiceWorkersView(APIView):
         except Service.DoesNotExist:
             return Response({"error": "Service not found."}, status=404)
         
-# Get available slots for a worker
+
 class WorkerSlotPageView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -329,6 +329,7 @@ class WorkerSlotPageView(APIView):
 
 
 class WorkerDetailView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request, worker_id):
         try:
             worker = Worker.objects.get(id=worker_id)
@@ -338,6 +339,7 @@ class WorkerDetailView(APIView):
             return Response({"error": "Worker not found"}, status=status.HTTP_404_NOT_FOUND)
 
 class ServiceDetailView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request, service_id):
         try:
             service = Service.objects.get(id=service_id)
@@ -347,6 +349,7 @@ class ServiceDetailView(APIView):
             return Response({"error": "Service not found"}, status=status.HTTP_404_NOT_FOUND)
 
 class SlotDetailView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request, slot_id):
         try:
             slot = Slot.objects.get(id=slot_id)
@@ -357,6 +360,7 @@ class SlotDetailView(APIView):
         
         
 class WorkerReviewsView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request, worker_id):
         reviews = Review.objects.filter(worker_id=worker_id)
         serializer = ReviewSerializer(reviews, many=True)
@@ -373,7 +377,7 @@ class PlatformFeeView(APIView):
         
         
 paypalrestsdk.configure({
-    'mode': 'sandbox',  # Change to 'live' for production
+    'mode': 'sandbox',  
     'client_id': settings.PAYPAL_CLIENT_ID,
     'client_secret': settings.PAYPAL_CLIENT_SECRET,
 })
@@ -412,10 +416,7 @@ class ExecutePayPalPayment(APIView):
         payment_id = request.data.get("paymentId")
         payer_id = request.data.get("payerId")
 
-        # Find the PayPal payment
         payment = paypalrestsdk.Payment.find(payment_id)
-
-        print(f"Payment found: {payment}")  # Debugging line
 
         # Execute the PayPal payment
         if payment.execute({"payer_id": payer_id}):
@@ -428,7 +429,7 @@ class ExecutePayPalPayment(APIView):
             user = request.user
 
             # Default platform fee (or from the service object)
-            platform_fee = getattr(service, 'platform_fee', 10)  # Default to 10 if not set
+            platform_fee = getattr(service, 'platform_fee', 10) 
             
             # Calculate total price and remaining balance
             total_price = service.hourly_rate + platform_fee
@@ -453,8 +454,6 @@ class ExecutePayPalPayment(APIView):
 
             return JsonResponse({"message": "Payment and booking successful", "booking_id": booking.id}, status=status.HTTP_200_OK)
         else:
-            # Debugging: Check if payment execution failed and print the error
-            print(f"Payment execution failed: {payment.error}")  # Debugging line
             return JsonResponse({"error": "Payment execution failed", "details": payment.error}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         
@@ -496,7 +495,7 @@ class BookingCreateView(APIView):
             return Response({
                 "message": "Booking created successfully",
                 "booking_id": booking.id,
-                "remaining_balance": str(remaining_balance)  # Ensure JSON-safe response
+                "remaining_balance": str(remaining_balance)  
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
@@ -504,6 +503,7 @@ class BookingCreateView(APIView):
 
 
 class BookingListView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         bookings = Booking.objects.filter(user=request.user)
         serializer = BookingSerializer(bookings, many=True)
@@ -511,6 +511,7 @@ class BookingListView(APIView):
 
 
 class BookingDetailView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request, booking_id):
         try:
             booking = Booking.objects.get(id=booking_id)
@@ -527,23 +528,18 @@ class CancelBookingView(APIView):
         try:
             booking = Booking.objects.get(id=booking_id)
 
-            # Ensure only the user who made the booking can cancel it
             if booking.user != request.user:
                 return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
 
-            # Allow cancellation only if status is not already cancelled
             if booking.status == "cancelled":
                 return Response({"error": "Booking is already cancelled"}, status=status.HTTP_400_BAD_REQUEST)
 
-            # If the booking is pending or processing, update payment status to refunded
             if booking.status in ["pending", "processing"]:
                 booking.payment_status = "refunded"
 
-            # Update booking status to cancelled
             booking.status = "cancelled"
             booking.save()
 
-            # Mark slot as available again
             slot = booking.slot
             slot.is_available = True
             slot.save()
@@ -566,13 +562,11 @@ class PayRemainingBalanceView(APIView):
         try:
             booking = Booking.objects.get(id=booking_id)
 
-            # Assuming the service price is part of the booking
             if booking.status == 'completed':
                 return Response({"detail": "Booking already completed."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Update the booking status and payment status
-            booking.status = 'completed'  # or whatever status is appropriate
-            booking.payment_status = 'completed'  # Assuming this field exists
+            booking.status = 'completed'  
+            booking.payment_status = 'completed'  
             booking.save()
             
             worker = booking.worker
@@ -657,7 +651,7 @@ class ReviewView(APIView):
 
         
 class ServiceReviewsAPIView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, service_id):
         try:
@@ -703,7 +697,7 @@ class CreateMemberView(View):
 
         member, created = RoomMember.objects.get_or_create(
             name=username,
-            uid=int(data["UID"]),  # Convert UID to int
+            uid=int(data["UID"]),  
             room_name=data["room_name"],
         )
 

@@ -6,11 +6,11 @@ from django.utils.timezone import now
 
 
 class UserSerializer(serializers.ModelSerializer):
-    confirm_password = serializers.CharField(write_only=True)  # Adding confirm_password field
+    confirm_password = serializers.CharField(write_only=True) 
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'phone_number', 'password', 'confirm_password']  # Don't include role in the frontend form
+        fields = ['username', 'email', 'phone_number', 'password', 'confirm_password'] 
         extra_kwargs = {
             'password': {'write_only': True},
         }
@@ -31,8 +31,8 @@ class UserSerializer(serializers.ModelSerializer):
         """
         Create a user with the validated data and automatically set the role to 'USER'.
         """
-        validated_data.pop('confirm_password')  # Remove confirm_password from validated data
-        validated_data['role'] = 'USER'  # Automatically assign the role as 'USER'
+        validated_data.pop('confirm_password')  
+        validated_data['role'] = 'USER' 
         user = User.objects.create_user(**validated_data)
         return user
     
@@ -66,7 +66,7 @@ class WorkerSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source="user.email", read_only=True)
     phone_number = serializers.CharField(source="user.phone_number", read_only=True)
     profile_picture = serializers.ImageField(source="user.profile_picture", read_only=True)
-    services = ServiceSerializer(many=True, read_only=True)  # Include related services
+    services = ServiceSerializer(many=True, read_only=True) 
 
     class Meta:
         model = Worker
@@ -77,7 +77,7 @@ class WorkerSerializer(serializers.ModelSerializer):
         ]
 
 class WorkerSlotSerializer(serializers.ModelSerializer):
-    worker = WorkerSerializer(read_only=True)  # Embed worker details
+    worker = WorkerSerializer(read_only=True)  
 
     class Meta:
         model = Slot
@@ -120,7 +120,7 @@ class WorkerWalletSerializer(serializers.ModelSerializer):
 
 class ReviewSerializer(serializers.ModelSerializer):
     user_name = serializers.SerializerMethodField()
-    worker_name = serializers.SerializerMethodField()  # New field for worker's name
+    worker_name = serializers.SerializerMethodField()  
 
     class Meta:
         model = Review
@@ -154,7 +154,7 @@ class VisitWorkerProfileSerializer(serializers.ModelSerializer):
 
 
 
-############################################################################# workers related serializers
+############################################################################# worker side related serializers
 
 
 class WorkerSignupSerializer(serializers.ModelSerializer):
