@@ -1,46 +1,47 @@
-from django.http import JsonResponse
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status,views
-from rest_framework.permissions import AllowAny
-from rest_framework import permissions
-from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate
-from .models import Booking, Review, RoomMember, User,Worker,Slot, WorkerWallet
-from .serializers import (BookingSerializer, ReviewSerializer, SlotSerializer, UserSerializer,UserProfileSerializer, VisitWorkerProfileSerializer, WorkerBookingSerializer, WorkerSerializer,WorkerSignupSerializer,
-                          WorkerProfileSerializer,ServiceSerializer,WorkerServiceSerializer, WorkerSlotSerializer)
-from .tokens import CustomRefreshToken
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views import View
-from django.contrib.auth import get_user_model
-from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.tokens import AccessToken
-from .utils import (generate_otp, send_otp_to_email, store_otp_in_cache, 
-    get_otp_from_cache,get_id_token_with_code_method_1,get_id_token_with_code_method_2)
-from .serializers import RequestPasswordResetSerializer, ResetPasswordSerializer
-from rest_framework import generics
+from datetime import timedelta
+from decimal import Decimal
+
+import json
+import paypalrestsdk
+import random
+import time
+
+from agora_token_builder import RtcTokenBuilder
+from django.conf import settings
+from django.contrib.auth import authenticate, get_user_model
 from django.core.cache import cache
 from django.core.mail import send_mail
-from admin_app.models import Service
+from django.db.models import Avg, Sum
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-from rest_framework.generics import RetrieveAPIView
 from django.utils import timezone
-from django.conf import settings
-import paypalrestsdk
-from decimal import Decimal
-from agora_token_builder import RtcTokenBuilder
-import json, time, random
-from datetime import timedelta
-from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from django.db.models import Count, Avg, Sum
-from api.models import Booking
-from api.models import WorkerWallet
-from api.models import Review
+from django.views import View
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework import generics, status
+from rest_framework.generics import RetrieveAPIView
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
 
-
+from rest_framework import permissions
+from admin_app.models import Service
+from api.models import Booking, Review, WorkerWallet
+from .models import Booking, Review, RoomMember, Slot, User, Worker, WorkerWallet
+from .serializers import (BookingSerializer, RequestPasswordResetSerializer, ResetPasswordSerializer,
+                         ReviewSerializer, ServiceSerializer, SlotSerializer, UserProfileSerializer,
+                         UserSerializer, VisitWorkerProfileSerializer, WorkerBookingSerializer,
+                         WorkerProfileSerializer, WorkerSerializer, WorkerServiceSerializer,
+                         WorkerSignupSerializer, WorkerSlotSerializer)
+from .tokens import CustomRefreshToken
+from .utils import (generate_otp, get_id_token_with_code_method_1, get_id_token_with_code_method_2,
+                   get_otp_from_cache, send_otp_to_email, store_otp_in_cache)
 
 User = get_user_model()
+
+from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 class SignupView(APIView):
     permission_classes = [AllowAny]  
@@ -1108,3 +1109,42 @@ class WorkerDashboardView(APIView):
 
         except Worker.DoesNotExist:
             return Response({"error": "Worker profile not found"}, status=404)
+
+
+class WorkerServiceBookingsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, service_id):
+        bookings = Booking.objects.filter(
+            worker=request.user.worker_profile, 
+            service_id=service_id, 
+            status__in=['pending', 'processing', 'started']
+        )
+        serializer = BookingSerializer(bookings, many=True)
+        return Response({"bookings": serializer.data})
+
+class WorkerServiceCancelBookingsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, service_id):
+        if not request.data.get("confirm"):
+            return Response({"error": "Confirmation required."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        bookings = Booking.objects.filter(
+            worker=request.user.worker_profile, 
+            service_id=service_id, 
+            status__in=['pending', 'processing', 'started']
+        )
+        bookings.update(status='cancelled')
+        return Response({"message": "All bookings for service cancelled successfully."})
+    
+    
+class WorkerTokenRefreshView(TokenRefreshView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        if not hasattr(request.user, 'worker_profile'):
+            return Response({"error": "Not a worker"}, status=status.HTTP_403_FORBIDDEN)
+        return super().post(request, *args, **kwargs)
+

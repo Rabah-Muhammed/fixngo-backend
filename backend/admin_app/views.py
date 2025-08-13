@@ -16,6 +16,8 @@ from rest_framework import generics
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import Count,Sum
 
+from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 class AdminLoginView(APIView):
     permission_classes = [AllowAny]
@@ -336,3 +338,13 @@ class ReviewListView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        
+class AdminTokenRefreshView(TokenRefreshView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        if not request.user.is_staff:
+            return Response({"error": "Not an admin"}, status=status.HTTP_403_FORBIDDEN)
+        return super().post(request, *args, **kwargs)
